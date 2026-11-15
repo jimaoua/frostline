@@ -1,5 +1,7 @@
 import type { Game } from '../game/Game';
 import type { HudSnapshot } from '../game/hud';
+import { useState, type PointerEvent as RPointerEvent } from 'react';
+import { storage } from '../platform/storage';
 import { MainMenu, PauseButton, PauseMenu, WelcomeBack } from './Menus';
 import { useHud } from './useHud';
 
@@ -70,10 +72,42 @@ export function Hud({ game }: { game: Game }) {
   );
 }
 
+const OBJECTIVE_MIN_KEY = 'frostline.ui.objectiveMin';
+
+/**
+ * The current mission. Compact and tucked to the left under the HUD; the
+ * button in its corner folds it into a one-line pill (remembered between
+ * sessions), and tapping the pill opens it again.
+ */
 function ObjectiveCard({ hud }: { hud: HudSnapshot }) {
+  const [min, setMin] = useState(() => storage.get(OBJECTIVE_MIN_KEY) === '1');
+  const toggle = () => {
+    setMin((v: boolean) => {
+      storage.set(OBJECTIVE_MIN_KEY, v ? '0' : '1');
+      return !v;
+    });
+  };
+  const stop = (e: RPointerEvent) => e.stopPropagation();
   const pct = hud.progress ? Math.min(100, (hud.progress.value / hud.progress.total) * 100) : 0;
+  if (min) {
+    return (
+      <button type="button" className="objective objective--min" key={`m-${hud.phase}-${hud.stepIndex}`} onPointerDown={stop} onClick={toggle} aria-label="Show mission">
+        <span className="objective__ring" style={{ ['--p' as string]: `${pct}%` }} />
+        <span className="objective__line">{hud.objective}</span>
+        {hud.progress && (
+          <b key={hud.progress.value} className="bump">
+            {hud.progress.value}/{hud.progress.total}
+          </b>
+        )}
+        <i className="objective__chev objective__chev--down" />
+      </button>
+    );
+  }
   return (
     <div className="objective" key={`${hud.phase}-${hud.stepIndex}`}>
+      <button type="button" className="objective__fold" onPointerDown={stop} onClick={toggle} aria-label="Hide mission">
+        <i className="objective__chev" />
+      </button>
       <div className="objective__phase">
         Phase {hud.phase} · {hud.phaseTitle}
         {hud.stepCount > 1 && (
