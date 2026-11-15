@@ -93,8 +93,8 @@ export function addXp(w: World, amount: number, at?: Vec): void {
     const pos = w.player.pos;
     let sub = `+$${reward} reward`;
     if (c.level % 3 === 0 && c.level <= 12) {
-      w.player.capacity += 2;
-      sub += ' · Bigger pack (+2)';
+      w.player.capacity += 4;
+      sub += ' · Bigger pack (+4)';
     }
     burst(w, 'confetti', pos, 34, { color: ['#ffd34d', '#6fdc8c', '#4aa3ff', '#ff7a6b', '#ffffff'], z: 40, speed: 1.9, up: 200, size: 3.4, life: 1.6 });
     w.shake = Math.max(w.shake, 0.35);

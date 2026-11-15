@@ -101,6 +101,8 @@ class AudioEngine {
       case 'land_ore':
         this.tone(now, 'square', (id === 'land_ore' ? 420 : 300) * v(), 0.05, 0.05, 220);
         break;
+      case 'land_salmon':
+      case 'land_smoked':
       case 'land_fish':
         this.tone(now, 'sine', 560 * v(), 0.07, 0.12, 360);
         break;

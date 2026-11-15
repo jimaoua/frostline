@@ -1,5 +1,6 @@
 import { storage } from '../platform/storage';
 import type { World } from './core/types';
+import { PLAYER_CAPACITY } from './core/constants';
 import { migrateProgress } from './progression/phases';
 import { createWorld } from './world/createWorld';
 
@@ -71,6 +72,10 @@ export function loadWorld(): LoadedSave | null {
     w.hitstop = 0;
     w.shake = 0;
     w.flash = 0;
+    // Packs doubled in size (v1.3): give older saves the bigger pack too.
+    const lv = Math.min(w.camp?.level ?? 1, 12);
+    const expected = PLAYER_CAPACITY + (w.upgrades.bigPacks ? 12 : 0) + 4 * Math.floor(lv / 3);
+    w.player.capacity = Math.max(w.player.capacity, expected);
     migrateProgress(w);
     return { world: w, awaySeconds: Math.max(0, (Date.now() - file.savedAt) / 1000) };
   } catch {

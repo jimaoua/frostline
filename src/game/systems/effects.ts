@@ -1,4 +1,4 @@
-import { ELDER_WOOD, FOOTPRINT_LIFE, NODE_AMOUNT } from '../core/constants';
+import { ELDER_WOOD, FOOTPRINT_LIFE, NODE_AMOUNT, CASH_STACK_MAX } from '../core/constants';
 import type { ItemKind, ParticleKind, Vec, World, Sfx } from '../core/types';
 
 /** Queue a sound/haptic cue (played by the host; at most a few per frame). */
@@ -23,7 +23,7 @@ export function addFlyer(
 /** Height (world-px) of the top of an armful of items. */
 export const stackTopZ = (count: number) => 20 + count * 4.2;
 /** Height of the top of the cash bundle stack on a back. */
-export const cashTopZ = (coins: number) => 24 + Math.min(24, Math.ceil(coins / 10)) * 3.4;
+export const cashTopZ = (coins: number) => 24 + Math.min(CASH_STACK_MAX, Math.ceil(coins / 10)) * 3.4;
 
 export function burst(
   w: World,

@@ -13,7 +13,10 @@ export const BASE_CENTER = { x: 22, y: 18 };
 // Movement (tiles / second).
 export const PLAYER_SPEED = 3.4;
 export const PLAYER_RADIUS = 0.26;
-export const PLAYER_CAPACITY = 12;
+/** Items the hero carries; stacks pile up tall (24 to start, more with upgrades). */
+export const PLAYER_CAPACITY = 24;
+/** Most cash bundles shown on the hero's back ($10 each). */
+export const CASH_STACK_MAX = 48;
 export const PLAYER_HP = 100;
 export const WORKER_SPEED = 2.3;
 export const HAULER_SPEED = 2.6;

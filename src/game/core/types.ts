@@ -287,6 +287,8 @@ export type Sfx =
   | 'land_coin'
   | 'land_stone'
   | 'land_ore'
+  | 'land_salmon'
+  | 'land_smoked'
   | 'build'
   | 'upgrade'
   | 'mission'

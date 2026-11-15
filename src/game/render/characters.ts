@@ -1,3 +1,4 @@
+import { CASH_STACK_MAX } from '../core/constants';
 import type { Emote, ItemKind, Mover, Wolf } from '../core/types';
 import { CASH_STEP, ITEM_STEP, drawStack } from './items';
 import type { HumanStyle } from './palette';
@@ -96,7 +97,7 @@ export function drawHuman(ctx: Ctx, sx: number, sy: number, m: Mover, s: HumanSt
 
   const holding = o.held.length > 0;
   const backX = -3 - side * 9;
-  const cashBundles = Math.min(24, Math.ceil((o.cash ?? 0) / 10));
+  const cashBundles = Math.min(CASH_STACK_MAX, Math.ceil((o.cash ?? 0) / 10));
   const cash: ItemKind[] = Array(cashBundles).fill('coin');
   const sway = moving ? Math.sin(m.walkPhase - 0.6) * 1.2 : breath * 0.25;
   const frontX = 3 + side * 8;

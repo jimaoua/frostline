@@ -64,7 +64,7 @@ export function completePad(w: World, pad: Pad): void {
 
 export function applyUpgrade(w: World, u: UpgradeId): void {
   w.upgrades[u] = true;
-  if (u === 'bigPacks') w.player.capacity += 6;
+  if (u === 'bigPacks') w.player.capacity += 12;
   if (u === 'bonfire') {
     w.structures.campfire.bumpAt = w.time;
     w.morale = Math.min(100, w.morale + 10);

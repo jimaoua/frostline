@@ -40,12 +40,27 @@ export interface AppState {
 
 export type GameSnapshot = HudSnapshot & { app: AppState };
 
+/**
+ * Haptics for game events. Every item that lands on a stack gives a tiny
+ * tick (the "pile it up" feel); hits and catches thump; builds and level-ups
+ * pulse.
+ */
 const HAPTIC: Partial<Record<Sfx, HapticKind>> = {
-  chop: 'light',
-  mine: 'light',
-  catch: 'light',
-  hit: 'light',
-  mission: 'medium',
+  land_wood: 'tick',
+  land_stone: 'tick',
+  land_ore: 'tick',
+  land_fish: 'tick',
+  land_meal: 'tick',
+  land_coin: 'tick',
+  land_salmon: 'tick',
+  land_smoked: 'tick',
+  chop: 'medium',
+  mine: 'medium',
+  catch: 'medium',
+  hit: 'medium',
+  cooked: 'light',
+  day: 'light',
+  mission: 'success',
   build: 'success',
   upgrade: 'success',
   levelup: 'success',
