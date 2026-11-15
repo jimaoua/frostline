@@ -43,6 +43,11 @@ export const QUADRANTS: Record<QuadrantId, QuadrantDef> = {
     rect: { x: 24, y: 16, w: 8, h: 8 },
     gates: [{ id: 'east', edges: ['v:32:19', 'v:32:20'], inPoint: { x: 31.3, y: 20 }, outPoint: { x: 33.1, y: 20 } }],
   },
+  west: {
+    id: 'west',
+    rect: { x: 8, y: 16, w: 8, h: 8 },
+    gates: [{ id: 'west', edges: ['v:8:19', 'v:8:20'], inPoint: { x: 8.7, y: 20 }, outPoint: { x: 6.9, y: 20 } }],
+  },
   north: {
     id: 'north',
     rect: { x: 16, y: 8, w: 8, h: 8 },
@@ -94,9 +99,35 @@ export const SPOTS = {
   upHatch: { x: 21.0, y: 23.3 },
   upFishing: { x: 16.9, y: 20.0 },
   upLumber: { x: 19.2, y: 18.4 },
+  // Chapter 2: the west yard and the frozen lake beyond it.
+  expandWest: { x: 14.9, y: 20.0 },
+  smokehouse: { x: 12.4, y: 18.0 },
+  smokeDrop: { x: 12.5, y: 19.3 },
+  market: { x: 10.4, y: 22.2 },
+  marketMat: { x: 12.0, y: 22.6 },
+  lakeCamp: { x: 9.7, y: 17.4 },
+  upSmoke: { x: 14.2, y: 17.2 },
+  porter: { x: 13.9, y: 21.0 },
+  tower3: { x: 8.9, y: 23.2 },
 } satisfies Record<string, Vec>;
 
 const ROCK_ZONE: Rect = { x: 34, y: 15, w: 6.5, h: 10 };
+
+/** The frozen lake west of the camp (world-space ellipse), revealed in Chapter 2. */
+export const LAKE = { x: 3.9, y: 20, rx: 2.75, ry: 5.4 };
+export const ICE_HOLES: Vec[] = [
+  { x: 3.1, y: 16.6 },
+  { x: 4.9, y: 18.3 },
+  { x: 2.6, y: 20.4 },
+  { x: 4.7, y: 22.0 },
+  { x: 3.3, y: 23.6 },
+];
+
+export function inLake(x: number, y: number, margin = 0): boolean {
+  const dx = (x - LAKE.x) / (LAKE.rx + margin);
+  const dy = (y - LAKE.y) / (LAKE.ry + margin);
+  return dx * dx + dy * dy < 1;
+}
 
 /** Queue positions outside the serving hatch, snaking toward the road. */
 export function queueSlot(i: number): Vec {
@@ -117,7 +148,8 @@ const inRect = (r: Rect, x: number, y: number, m = 0) =>
 export function generateNodes(rng: () => number): ResourceNode[] {
   const nodes: ResourceNode[] = [];
   let id = 1;
-  const rects = Object.values(QUADRANTS).map((q) => q.rect);
+  // The west yard keeps its forest until Chapter 2 clears it.
+  const rects = Object.values(QUADRANTS).filter((q) => q.id !== 'west').map((q) => q.rect);
   const gateOuts = Object.values(QUADRANTS).flatMap((q) => q.gates.map((g) => g.outPoint));
   const taken: Vec[] = [];
   const free = (x: number, y: number, d: number) => taken.every((t) => Math.hypot(t.x - x, t.y - y) >= d);

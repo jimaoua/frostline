@@ -4,6 +4,7 @@ import type { Carryable, NodeKind, ResourceNode, Vec, Worker, World } from '../c
 import { SPOTS } from '../world/layout';
 import { addFlyer, ring, stackTopZ } from './effects';
 import { hitNode } from './interact';
+import { iceSplash } from './lake';
 import { brake, followRoute, updateMotion } from './motion';
 import { fishPace, lumberPace } from './levels';
 import { planRoute } from './routing';
@@ -13,8 +14,11 @@ const FISHER_SPOT: Vec = { x: 17.6, y: 20.35 };
 /** Morale scales how briskly the camp works (0.75x … 1.2x). */
 export const moraleFactor = (w: World) => 0.75 + (w.morale / 100) * 0.45;
 
-const dropFor = (w: World, wk: Worker) => (wk.role === 'miner' ? w.structures.stonepile : w.structures.woodpile);
-const nodeKindFor = (wk: Worker): NodeKind => (wk.role === 'miner' ? 'rock' : 'tree');
+const dropFor = (w: World, wk: Worker) =>
+  wk.role === 'miner' ? w.structures.stonepile : wk.role === 'icefisher' ? w.structures.smokehouse : w.structures.woodpile;
+const nodeKindFor = (wk: Worker): NodeKind => (wk.role === 'miner' ? 'rock' : wk.role === 'icefisher' ? 'icehole' : 'tree');
+/** Where workers stand to hand over at a building (the smokehouse has a drop spot). */
+const dropSpot = (w: World, wk: Worker): Vec => (wk.role === 'icefisher' ? SPOTS.smokeDrop : dropFor(w, wk).pos);
 
 function goTo(w: World, wk: Worker, to: Vec): void {
   wk.route = planRoute(w.base, wk.pos, to);
@@ -24,7 +28,7 @@ function findNode(w: World, wk: Worker): ResourceNode | null {
   const anchor = dropFor(w, wk).pos;
   const kind = nodeKindFor(wk);
   let best: ResourceNode | null = null;
-  let bestD = 15;
+  let bestD = wk.role === 'icefisher' ? 30 : 15;
   for (const n of w.nodes) {
     if (n.kind !== kind || n.elder || !n.visible || !n.interactive || n.amount <= 0 || n.popT > 0 || n.claimedBy !== null) continue;
     const d = dist(anchor, n.pos) + (dist(w.player.pos, n.pos) < 2 ? 4 : 0);
@@ -40,7 +44,7 @@ function approach(node: ResourceNode, from: Vec): Vec {
   const dx = from.x - node.pos.x;
   const dy = from.y - node.pos.y;
   const d = Math.hypot(dx, dy) || 1;
-  const r = node.kind === 'rock' ? 0.75 : 0.6;
+  const r = node.kind === 'rock' ? 0.75 : node.kind === 'icehole' ? 0.7 : 0.6;
   return { x: node.pos.x + (dx / d) * r, y: node.pos.y + (dy / d) * r };
 }
 
@@ -93,6 +97,15 @@ function chooseTask(w: World, wk: Worker, dt: number): void {
       goTo(w, wk, FISHER_SPOT);
       wk.state = 'toNode';
       return;
+    case 'porter':
+      if (w.smoke.ready > 0 && w.structures.marketMat.built) {
+        goTo(w, wk, SPOTS.smokeDrop);
+        wk.state = 'toPickup';
+        return;
+      }
+      wk.idleT = 1;
+      wander(w, wk);
+      return;
     case 'cook':
       if (k.tray > 0 && k.counter < 14) {
         goTo(w, wk, { x: w.structures.grill.pos.x + 0.7, y: w.structures.grill.pos.y + 0.55 });
@@ -112,7 +125,7 @@ function chooseTask(w: World, wk: Worker, dt: number): void {
       }
       node.claimedBy = wk.id;
       wk.nodeId = node.id;
-      goTo(w, wk, approach(node, dropFor(w, wk).pos));
+      goTo(w, wk, approach(node, dropSpot(w, wk)));
       wk.state = 'toNode';
     }
   }
@@ -180,10 +193,30 @@ function updateWorker(w: World, wk: Worker, dt: number): void {
       if (!node || node.amount <= 0) {
         release(w, wk);
         wk.state = wk.carry.length ? 'toDrop' : 'idle';
-        if (wk.carry.length) goTo(w, wk, dropFor(w, wk).pos);
+        if (wk.carry.length) goTo(w, wk, dropSpot(w, wk));
         break;
       }
       wk.lookAt = node.pos;
+      if (wk.role === 'icefisher') {
+        // Fishing through the ice: slower than chopping, a salmon per catch.
+        wk.workT -= dt * pace * fishPace(w);
+        if (wk.workT > 0) break;
+        wk.workT = 1.6;
+        wk.swing = 1;
+        hitNode(w, node);
+        wk.carry.push('salmon');
+        w.stats.salmonCaught++;
+        iceSplash(w, node.pos);
+        addFlyer(w, 'salmon', node.pos, 4, () => wk.pos, stackTopZ(wk.carry.length), 0.36, 36);
+        if (wk.carry.length >= wk.capacity || node.amount <= 0) {
+          release(w, wk);
+          if (wk.carry.length >= wk.capacity) {
+            goTo(w, wk, dropSpot(w, wk));
+            wk.state = 'toDrop';
+          } else wk.state = 'idle';
+        }
+        break;
+      }
       wk.workT -= dt * pace * (w.upgrades.sharpAxes ? 1.4 : 1) * (wk.role === 'lumberjack' ? lumberPace(w) : 1);
       if (wk.workT > 0) break;
       wk.workT = 0.75;
@@ -214,6 +247,20 @@ function updateWorker(w: World, wk: Worker, dt: number): void {
         wk.carry = [];
         wk.state = 'idle';
         wk.idleT = 0.2;
+        break;
+      }
+      if (wk.role === 'icefisher') {
+        const sh = w.structures.smokehouse;
+        wk.lookAt = sh.pos;
+        wk.carry.forEach((_, i) =>
+          addFlyer(w, 'salmon', wk.pos, stackTopZ(i), sh.pos, 24, 0.25 + i * 0.06, 16, () => {
+            w.smoke.raw++;
+            sh.bumpAt = w.time;
+          }),
+        );
+        wk.carry = [];
+        wk.state = 'idle';
+        wk.idleT = 0.3;
         break;
       }
       const pile = dropFor(w, wk);
@@ -250,6 +297,21 @@ function updateWorker(w: World, wk: Worker, dt: number): void {
         wk.state = 'toSell';
         break;
       }
+      if (wk.role === 'porter') {
+        const n = Math.min(wk.capacity, w.smoke.ready);
+        if (n <= 0) {
+          wk.state = 'idle';
+          break;
+        }
+        w.smoke.ready -= n;
+        for (let i = 0; i < n; i++) {
+          wk.carry.push('smoked');
+          addFlyer(w, 'smoked', SPOTS.smokeDrop, 10, () => wk.pos, stackTopZ(i + 1), 0.22 + i * 0.05, 16);
+        }
+        goTo(w, wk, w.structures.marketMat.pos);
+        wk.state = 'toSell';
+        break;
+      }
       const kind: Carryable = dist(wk.pos, w.structures.stonepile.pos) < dist(wk.pos, w.structures.woodpile.pos) ? 'stone' : 'wood';
       const pile = kind === 'stone' ? w.structures.stonepile : w.structures.woodpile;
       const n = Math.min(wk.capacity, w.stock[kind]);
@@ -282,6 +344,20 @@ function updateWorker(w: World, wk: Worker, dt: number): void {
         wk.carry = [];
         wk.state = 'idle';
         wk.idleT = 0.3;
+        break;
+      }
+      if (wk.role === 'porter') {
+        const mm = w.structures.marketMat;
+        wk.carry.forEach((item, i) => {
+          w.marketCash += SELL_PRICE[item];
+          w.stats.smokedSold++;
+          addFlyer(w, item, wk.pos, stackTopZ(i), mm.pos, 6, 0.25 + i * 0.05, 16, () => {
+            mm.bumpAt = w.time;
+          });
+        });
+        wk.carry = [];
+        wk.state = 'idle';
+        wk.idleT = 0.4;
         break;
       }
       const mat = w.structures.tradeMat;

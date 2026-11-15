@@ -3,6 +3,8 @@ import { dist } from '../core/math';
 import type { PadId, StationId, Stats, Vec, World } from '../core/types';
 import { activatePad, buildStructure } from '../systems/build';
 import { addXp, showToast } from '../systems/levels';
+import { popup } from '../systems/effects';
+import { clearWestYard } from '../systems/lake';
 import { spawnStranded } from '../systems/settlement';
 import { SPOTS } from '../world/layout';
 
@@ -53,7 +55,28 @@ function nearestTree(w: World): Vec | null {
 
 /** Where cash is waiting, if anywhere. */
 const cashTarget = (w: World): Vec | null =>
-  w.kitchen.cash > 0 ? w.structures.cashPad.pos : w.coinPile > 0 && w.structures.tradeMat.built ? w.structures.tradeMat.pos : null;
+  w.kitchen.cash > 0
+    ? w.structures.cashPad.pos
+    : w.marketCash > 0 && w.structures.marketMat.built
+      ? w.structures.marketMat.pos
+      : w.coinPile > 0 && w.structures.tradeMat.built
+        ? w.structures.tradeMat.pos
+        : null;
+
+/** The closest lake hole with fish in it (Chapter 2). */
+function nearestIceHole(w: World): Vec | null {
+  let best: Vec | null = null;
+  let bd = Infinity;
+  for (const n of w.nodes) {
+    if (n.kind !== 'icehole' || n.amount <= 0) continue;
+    const d = dist(n.pos, w.player.pos);
+    if (d < bd) {
+      bd = d;
+      best = n.pos;
+    }
+  }
+  return best;
+}
 
 /** Guide through the kitchen loop: fish → grill → hatch. */
 function kitchenTarget(w: World): Vec {
@@ -318,6 +341,32 @@ export const PHASES: PhaseDef[] = [
       padStep('shelter', 'Build a Shelter', 'Fed survivors may settle in for good.'),
       padStep('traps', 'Set traps at the gates'),
       padStep('gatehouse', 'Reinforce the gatehouse', 'Gates slam shut when raiders come.'),
+    ],
+  },
+  {
+    id: 7,
+    title: 'The Frozen Lake',
+    enter: (w) => {
+      clearWestYard(w);
+      popup(w, SPOTS.expandWest, 80, 'Chapter 2: The Frozen Lake', '#bfe6ff', true);
+    },
+    steps: [
+      padStep('expandWest', 'Push the stockade west', 'Something glitters beyond the western trees.'),
+      padStep('tower3', 'Raise a watchtower by the lake', 'The new west gate needs guarding: wolves cross the ice.'),
+      padStep('smokehouse', 'Build the Smokehouse', 'Smoked salmon sells for a fortune.'),
+      countStep('salmon', 'Catch 5 salmon through the ice', 'salmonCaught', 5, 'Stand by a hole in the lake ice to fish.', undefined, (w) =>
+        carrying(w, 'salmon') >= 5 ? SPOTS.smokeDrop : nearestIceHole(w),
+      ),
+      countStep('smoke', 'Smoke 5 salmon', 'salmonSmoked', 5, 'Drop salmon at the Smokehouse, then wait for the racks.', undefined, (w) =>
+        carrying(w, 'salmon') > 0 || w.smoke.raw > 0 || w.smoke.slots.some((x) => x >= 0) ? SPOTS.smokeDrop : nearestIceHole(w),
+      ),
+      padStep('market', 'Open the Fish Market'),
+      countStep('sellSmoked', 'Sell 5 smoked fish', 'smokedSold', 5, 'Carry smoked fish to the market mat.', undefined, (w) =>
+        carrying(w, 'smoked') > 0 ? w.structures.marketMat.pos : w.smoke.ready > 0 ? SPOTS.smokeDrop : carrying(w, 'salmon') > 0 ? SPOTS.smokeDrop : nearestIceHole(w),
+      ),
+      padStep('lakeCamp', "Build the Ice Fishers' Hut", 'Two ice fishers will keep the racks full.'),
+      levelStep('upSmoke', 'smoke', 'Upgrade the Smokehouse', 'Faster racks, more fish to sell.'),
+      padStep('porter', 'Hire a market porter', 'The porter carries smoked fish to the market for you.'),
       {
         id: 'endless',
         text: (w) => `Endure the frontier · Day ${w.day.day}`,
@@ -351,7 +400,27 @@ export function startProgression(w: World): void {
   enterStep(w);
 }
 
+/**
+ * Saves made before a chapter was added can point past the end of a phase
+ * (e.g. the old Phase 6 "endless" step). Move them on to the next real step.
+ */
+export function migrateProgress(w: World): void {
+  w.phase = Math.max(1, Math.min(PHASES.length, w.phase));
+  let guard = 0;
+  while (!PHASES[w.phase - 1].steps[w.stepIndex] && guard++ < 20) {
+    if (w.phase >= PHASES.length) {
+      w.stepIndex = PHASES[w.phase - 1].steps.length - 1;
+      break;
+    }
+    w.phase++;
+    w.stepIndex = 0;
+    PHASES[w.phase - 1].enter?.(w);
+    enterStep(w);
+  }
+}
+
 export function updateProgression(w: World): void {
+  migrateProgress(w);
   const phase = PHASES[w.phase - 1];
   const step = phase.steps[w.stepIndex];
   w.guide = step.target?.(w) ?? null;

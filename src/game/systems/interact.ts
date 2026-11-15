@@ -5,6 +5,7 @@ import type { Carryable, Pad, ResourceNode, Vec, World } from '../core/types';
 import { SPOTS } from '../world/layout';
 import { completePad } from './build';
 import { addFlyer, burst, cashTopZ, popup, ring, sfx, stackTopZ } from './effects';
+import { iceSplash, lakeInteractions } from './lake';
 
 const playerTarget = (w: World) => () => w.player.pos;
 const GRILL_TRAY = (w: World): Vec => ({ x: w.structures.grill.pos.x + 0.55, y: w.structures.grill.pos.y + 0.35 });
@@ -140,6 +141,9 @@ export function updatePlayerInteractions(w: World, dt: number): void {
     return;
   }
 
+  // Chapter 2: smokehouse and fish market.
+  if (lakeInteractions(w)) return;
+
   // Visiting caravan pays double for anything you carry.
   const cv = w.caravan;
   if (cv && cv.state === 'trading' && dist(p.pos, cv.pos) < 1.4 && p.carry.length) {
@@ -215,6 +219,7 @@ function canHarvest(w: World, n: ResourceNode): boolean {
   if (!n.visible || !n.interactive || n.amount <= 0 || n.popT > 0) return false;
   if (n.kind === 'tree') return w.flags.harvestWood;
   if (n.kind === 'rock') return w.flags.harvestStone;
+  if (n.kind === 'icehole') return w.flags.lake;
   return w.flags.harvestOre;
 }
 
@@ -238,6 +243,21 @@ function harvest(w: World): void {
   const node = nearestNode(w, p.pos, 1.05);
   if (!node) return;
   p.lookAt = node.pos;
+  if (node.kind === 'icehole') {
+    // Fishing through the lake ice: the rod comes out, salmon come up.
+    p.tool = 'rod';
+    if (p.actionT > 0) return;
+    hitNode(w, node);
+    p.actionT = playerFishInterval(w) * 0.85;
+    p.swing = 1;
+    p.carry.push('salmon');
+    w.stats.salmonCaught++;
+    iceSplash(w, node.pos);
+    addFlyer(w, 'salmon', node.pos, 4, playerTarget(w), stackTopZ(p.carry.length), 0.38, 40);
+    sfx(w, 'catch');
+    popup(w, node.pos, 40, '+1', '#ffb59a');
+    return;
+  }
   if (p.actionT > 0) return;
   hitNode(w, node);
   p.actionT = w.upgrades.sharpAxes ? 0.28 : 0.42;
@@ -255,6 +275,16 @@ function harvest(w: World): void {
 export function hitNode(w: World, node: ResourceNode): void {
   node.amount--;
   node.shake = 1;
+  if (node.kind === 'icehole') {
+    // A fished-out hole skins over with ice until the fish return.
+    if (node.amount <= 0) {
+      node.amount = 0;
+      node.regrowT = REGROW.icehole;
+      node.claimedBy = null;
+      ring(w, node.pos, 0.7, '#ffffff', 0.4);
+    }
+    return;
+  }
   const tree = node.kind === 'tree';
   burst(w, 'chip', node.pos, 5, {
     color: tree ? ['#c9874e', '#e2a96f'] : node.kind === 'ore' ? ['#ffb347', '#6b7787'] : ['#9aa6b4', '#c6ced8'],

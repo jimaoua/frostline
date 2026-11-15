@@ -71,7 +71,7 @@ export const PLAYER_STYLE: HumanStyle = {
   scarf: '#e9493a',
 };
 
-export type StyledRole = 'lumberjack' | 'miner' | 'hauler' | 'fisher' | 'cook';
+export type StyledRole = 'lumberjack' | 'miner' | 'hauler' | 'fisher' | 'cook' | 'icefisher' | 'porter';
 
 export const WORKER_STYLES: Record<StyledRole, HumanStyle> = {
   lumberjack: {
@@ -93,6 +93,15 @@ export const WORKER_STYLES: Record<StyledRole, HumanStyle> = {
   cook: {
     coat: '#f2f2ee', coatDark: '#c9ccd2', coatLight: '#ffffff', trim: '#e9493a', hat: '#ffffff', hatType: 'chef',
     skin: '#f0c49c', hair: '#3a2a20', pants: '#3d3a40', boots: '#2b2420',
+  },
+  // Chapter 2: teal fur-hooded ice fishers and a plum-coated market porter.
+  icefisher: {
+    coat: '#2f9ea0', coatDark: '#1f7476', coatLight: '#5cc4c4', trim: '#f4efe4', hat: '#1f7476', hatType: 'hood',
+    skin: '#e9bb93', hair: '#4a3020', pants: '#2f3a4c', boots: '#2b2a2e', scarf: '#ff9a3c',
+  },
+  porter: {
+    coat: '#8c4a7a', coatDark: '#663457', coatLight: '#b06e9e', trim: '#f3ece6', hat: '#3b3d45', hatType: 'cap',
+    skin: '#d9a982', hair: '#2a1d16', pants: '#3a3f4c', boots: '#2a2420', scarf: '#e9c46a',
   },
 };
 

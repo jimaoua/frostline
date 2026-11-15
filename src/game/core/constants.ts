@@ -27,7 +27,11 @@ export const MAX_FOOTPRINTS = 700;
 
 // Economy.
 export const FIRE_WOOD_REQUIRED = 6;
-export const SELL_PRICE = { wood: 2, stone: 4, ore: 12, fish: 2, meal: 6 } as const;
+export const SELL_PRICE = { wood: 2, stone: 4, ore: 12, fish: 2, meal: 6, salmon: 4, smoked: 18 } as const;
+
+// Chapter 2: the frozen lake.
+export const SMOKE_TIME = 3.2;
+export const SMOKE_SLOTS = 2;
 export const MEAL_PRICE = 10;
 export const COOK_TIME = 1.7;
 export const GRILL_SLOTS = 3;
@@ -36,9 +40,9 @@ export const MAX_QUEUE = 6;
 export const BOUNTY = { wolf: 5, bear: 25 } as const;
 
 // Resource nodes.
-export const NODE_AMOUNT = { tree: 4, rock: 5, ore: 3 } as const;
+export const NODE_AMOUNT = { tree: 4, rock: 5, ore: 3, icehole: 3 } as const;
 export const ELDER_WOOD = 8;
-export const REGROW = { tree: 22, rock: 30, ore: 45 } as const;
+export const REGROW = { tree: 22, rock: 30, ore: 45, icehole: 16 } as const;
 
 // Defense.
 export const WAVE_INTERVAL = 75;

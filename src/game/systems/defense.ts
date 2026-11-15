@@ -47,7 +47,8 @@ function spawnWave(w: World): void {
   sfx(w, 'howl');
   d.waveActive = true;
   const fire = w.structures.campfire.pos;
-  const count = 1 + d.wave * 2;
+  // Packs grow with each wave but level off, so long games stay winnable.
+  const count = Math.min(1 + d.wave * 2, 9);
   const side = w.rng() * Math.PI * 2;
   for (let i = 0; i < count; i++) {
     const a = side + (w.rng() - 0.5) * 1.4;
@@ -59,7 +60,7 @@ function spawnWave(w: World): void {
     const bear = d.wave >= 3 && i === 0;
     const ringA = w.rng() * Math.PI * 2;
     const target = { x: fire.x + Math.cos(ringA) * 1.15, y: fire.y + Math.sin(ringA) * 1.15 };
-    const wolf = makePredator(w, bear ? 'bear' : 'wolf', pos, 'raid', d.wave - 1);
+    const wolf = makePredator(w, bear ? 'bear' : 'wolf', pos, 'raid', Math.min(d.wave - 1, 5));
     wolf.route = planRoute(w.base, pos, target);
     w.wolves.push(wolf);
   }

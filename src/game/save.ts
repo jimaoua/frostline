@@ -1,5 +1,6 @@
 import { storage } from '../platform/storage';
 import type { World } from './core/types';
+import { migrateProgress } from './progression/phases';
 import { createWorld } from './world/createWorld';
 
 /**
@@ -54,7 +55,14 @@ export function loadWorld(): LoadedSave | null {
     if (file.version !== VERSION || !file.world) return null;
     // Start from a fresh world (generator, layout, empty effects), then lay the saved state over it.
     const w = createWorld(Date.now() % 100000);
-    Object.assign(w, file.world);
+    // Lay the save over the fresh world. Records (structures, pads, stats,
+    // levels, flags, stock…) are merged so content added in later versions
+    // (e.g. Chapter 2 buildings) is present in old saves too.
+    const fresh = w as unknown as Record<string, unknown>;
+    for (const [k, v] of Object.entries(file.world as Record<string, unknown>)) {
+      const cur = fresh[k];
+      fresh[k] = isRecord(cur) && isRecord(v) ? { ...cur, ...v } : v;
+    }
     for (const q of file.unlocked) w.base.unlock(q as Parameters<World['base']['unlock']>[0]);
     // Guard fields added after a save was written.
     w.sfx = [];
@@ -63,6 +71,7 @@ export function loadWorld(): LoadedSave | null {
     w.hitstop = 0;
     w.shake = 0;
     w.flash = 0;
+    migrateProgress(w);
     return { world: w, awaySeconds: Math.max(0, (Date.now() - file.savedAt) / 1000) };
   } catch {
     return null;
@@ -75,4 +84,8 @@ export function hasSave(): boolean {
 
 export function deleteSave(): void {
   storage.remove(KEY);
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }

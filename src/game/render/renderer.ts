@@ -10,6 +10,7 @@ import { drawHuman, drawWolf } from './characters';
 import { drawExpandZone, drawFireRing, drawPad, drawPadBadge, drawWarmZone } from './floor';
 import { drawArrows, drawFireGlow, drawFlyers, drawFootprints, drawParticles, drawPopups, Snowfall } from './fx';
 import { drawBaseEdges, drawGround, type View } from './ground';
+import { drawIceHole, drawLake, drawLakeCamp, drawMarket, drawSmokehouse } from './lake';
 import { LightMap, type Light } from './lighting';
 import { drawNode } from './nature';
 import { PLAYER_STYLE, SURVIVOR_STYLES, TRADER_STYLE, WORKER_STYLES } from './palette';
@@ -132,6 +133,15 @@ export class Renderer {
 
     /* ---------- Ground layer ---------- */
     drawGround(ctx, w, view, time);
+    // Chapter 2: the frozen lake and its fishing holes lie flat on the ground.
+    if (w.flags.lake) {
+      drawLake(ctx, time);
+      for (const n of w.nodes) {
+        if (n.kind !== 'icehole') continue;
+        const s = toScreen(n.pos.x, n.pos.y);
+        if (visible(s.x, s.y)) drawIceHole(ctx, n, s.x, s.y, time);
+      }
+    }
     drawBaseEdges(ctx, w);
     const S = w.structures;
     if (S.fishPond.built) {
@@ -155,6 +165,10 @@ export class Renderer {
     if (S.tradeMat.built) {
       const s = toScreen(S.tradeMat.pos.x, S.tradeMat.pos.y);
       drawTradeMat(ctx, w.coinPile, s.x, s.y, time, S.tradeMat.bumpAt);
+    }
+    if (S.marketMat.built) {
+      const s = toScreen(S.marketMat.pos.x, S.marketMat.pos.y);
+      drawTradeMat(ctx, w.marketCash, s.x, s.y, time, S.marketMat.bumpAt);
     }
     if (S.cashPad.built) {
       const s = toScreen(S.cashPad.pos.x, S.cashPad.pos.y);
@@ -193,7 +207,7 @@ export class Renderer {
       });
     }
     for (const n of w.nodes) {
-      if (!n.visible) continue;
+      if (!n.visible || n.kind === 'icehole') continue;
       const s = toScreen(n.pos.x, n.pos.y);
       if (visible(s.x, s.y, 200)) items.push({ depth: n.pos.x + n.pos.y, draw: () => drawNode(ctx, sp, n, s.x, s.y, time, windSway) });
     }
@@ -247,8 +261,21 @@ export class Renderer {
         case 'stonepile':
           draw = () => drawPile(ctx, 'stone', w.stock.stone, s.x, s.y, st.bumpAt, time);
           break;
+        case 'smokehouse':
+          draw = () => drawSmokehouse(ctx, w.smoke, st.bumpAt, s.x, s.y, time, b, night);
+          dd = 0.4;
+          break;
+        case 'market':
+          draw = () => drawMarket(ctx, s.x, s.y, time, b, night);
+          dd = 0.3;
+          break;
+        case 'lakeCamp':
+          draw = () => drawLakeCamp(ctx, s.x, s.y, time, b, night);
+          dd = 0.3;
+          break;
         case 'tower1':
-        case 'tower2': {
+        case 'tower2':
+        case 'tower3': {
           const t = w.towers.find((x) => x.id === st.id);
           if (t) draw = () => drawTower(ctx, t, s.x, s.y, time, b, night);
           dd = 0.2;
@@ -271,7 +298,8 @@ export class Renderer {
     for (const wk of w.workers) {
       const s = toScreen(wk.pos.x, wk.pos.y);
       if (!visible(s.x, s.y)) continue;
-      const tool = wk.role === 'lumberjack' ? 'axe' : wk.role === 'miner' ? 'pick' : wk.role === 'fisher' && wk.state === 'working' ? 'rod' : null;
+      const tool =
+        wk.role === 'lumberjack' ? 'axe' : wk.role === 'miner' ? 'pick' : (wk.role === 'fisher' || wk.role === 'icefisher') && wk.state === 'working' ? 'rod' : null;
       items.push({
         depth: wk.pos.x + wk.pos.y,
         draw: () =>

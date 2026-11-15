@@ -1,4 +1,4 @@
-import { DAY_LENGTH, GRILL_SLOTS, MORALE_START, PLAYER_CAPACITY, PLAYER_HP, PLAYER_SPEED } from '../core/constants';
+import { DAY_LENGTH, GRILL_SLOTS, MORALE_START, PLAYER_CAPACITY, PLAYER_HP, PLAYER_SPEED, SMOKE_SLOTS } from '../core/constants';
 import { mulberry32 } from '../core/math';
 import type { Ghost, ItemKind, Pad, PadEffect, PadIcon, PadId, Player, Stats, Structure, StructureId, Vec, World } from '../core/types';
 import { makeMover } from '../systems/motion';
@@ -51,6 +51,9 @@ export const emptyStats = (): Stats => ({
   mealsServed: 0,
   rescued: 0,
   cashCollected: 0,
+  salmonCaught: 0,
+  salmonSmoked: 0,
+  smokedSold: 0,
 });
 
 export function createWorld(seed = 7): World {
@@ -101,6 +104,11 @@ export function createWorld(seed = 7): World {
       tower2: structure('tower2', S.tower2, 0.5),
       workshop: structure('workshop', S.workshop, 1.0),
       shelter: structure('shelter', S.shelter, 1.0),
+      smokehouse: structure('smokehouse', S.smokehouse, 0.85),
+      market: structure('market', S.market, 0.8),
+      marketMat: structure('marketMat', S.marketMat, 0),
+      lakeCamp: structure('lakeCamp', S.lakeCamp, 0.85),
+      tower3: structure('tower3', S.tower3, 0.5),
     },
     pads: {
       grill: pad('grill', 'Fish Grill', 'grill', S.grill, 1.5, 'wood', 6, { type: 'build', structures: ['grill'] }, { w: 1.2, d: 0.8, h: 22 }),
@@ -125,19 +133,30 @@ export function createWorld(seed = 7): World {
       upHatch: { ...pad('upHatch', 'Tastier Meals', 'trade', S.upHatch, 1.2, 'coin', 90, { type: 'level', station: 'hatch' }), level: 2 },
       upFishing: { ...pad('upFishing', 'Better Nets', 'fish', S.upFishing, 1.2, 'coin', 120, { type: 'level', station: 'fishing' }), level: 2 },
       upLumber: { ...pad('upLumber', 'Sharper Saws', 'hut', S.upLumber, 1.2, 'coin', 150, { type: 'level', station: 'lumber' }), level: 2 },
+      // Chapter 2: the frozen lake.
+      expandWest: pad('expandWest', 'West Yard', 'expand', S.expandWest, 1.6, 'coin', 700, { type: 'expand', quadrant: 'west' }),
+      smokehouse: pad('smokehouse', 'Smokehouse', 'grill', S.smokehouse, 1.7, 'coin', 250, { type: 'build', structures: ['smokehouse'] }, { w: 1.4, d: 1.1, h: 46 }),
+      market: pad('market', 'Fish Market', 'trade', S.market, 1.6, 'coin', 350, { type: 'build', structures: ['market', 'marketMat'] }, { w: 1.5, d: 1.0, h: 40 }),
+      lakeCamp: pad('lakeCamp', "Ice Fishers' Hut", 'fish', S.lakeCamp, 1.6, 'coin', 700, { type: 'build', structures: ['lakeCamp'] }, { w: 1.4, d: 1.1, h: 44 }),
+      upSmoke: { ...pad('upSmoke', 'Bigger Smokehouse', 'grill', S.upSmoke, 1.2, 'coin', 400, { type: 'level', station: 'smoke' }), level: 2 },
+      porter: pad('porter', 'Market Porter', 'person', S.porter, 1.3, 'coin', 400, { type: 'hireRole', role: 'porter' }),
+      tower3: pad('tower3', 'Lake Watchtower', 'tower', S.tower3, 1.4, 'coin', 450, { type: 'build', structures: ['tower3'] }, { w: 1.05, d: 1.05, h: 100 }),
     },
     towers: [],
     traps: [],
     doors: {},
     upgrades: { bonfire: false, sharpAxes: false, bigPacks: false, ironArrows: false, traps: false, gatehouse: false },
-    stock: { wood: 0, stone: 0, ore: 0, fish: 0, meal: 0 },
+    stock: { wood: 0, stone: 0, ore: 0, fish: 0, meal: 0, salmon: 0, smoked: 0 },
     kitchen: { raw: 0, slots: Array(GRILL_SLOTS).fill(-1), tray: 0, counter: 0, cash: 0 },
     coins: 0,
     coinPile: 0,
+    smoke: { raw: 0, slots: Array(SMOKE_SLOTS).fill(-1), ready: 0 },
+    marketCash: 0,
     fire: { lit: false, fuel: 0, litAt: -10 },
     defense: { visible: false, health: 100, maxHealth: 100, wave: 0, nextWaveIn: null, waveActive: false, wavesCleared: 0, autoWaves: false },
     stats: emptyStats(),
     flags: {
+      lake: false,
       harvestWood: false,
       harvestStone: false,
       harvestOre: false,
@@ -168,7 +187,7 @@ export function createWorld(seed = 7): World {
     arrows: [],
     nextId: 1000,
     rng,
-    levels: { grill: 1, hatch: 1, fishing: 1, lumber: 1 },
+    levels: { grill: 1, hatch: 1, fishing: 1, lumber: 1, smoke: 1 },
     camp: { level: 1, xp: 0, next: campXpFor(1) },
     toast: null,
     tutorial: { moved: 0 },

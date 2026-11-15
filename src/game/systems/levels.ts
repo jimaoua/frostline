@@ -1,4 +1,4 @@
-import { COOK_TIME, FISH_INTERVAL, MEAL_PRICE } from '../core/constants';
+import { COOK_TIME, FISH_INTERVAL, MEAL_PRICE, SMOKE_TIME } from '../core/constants';
 import type { Pad, StationId, Vec, World } from '../core/types';
 import { burst, celebrate, popup, sfx } from './effects';
 
@@ -20,6 +20,7 @@ export const STATION_LABEL: Record<StationId, string> = {
   hatch: 'Serving hatch',
   fishing: 'Fishing',
   lumber: 'Lumber camp',
+  smoke: 'Smokehouse',
 };
 
 const STATION_PERK: Record<StationId, string> = {
@@ -27,6 +28,7 @@ const STATION_PERK: Record<StationId, string> = {
   hatch: 'Meals pay more',
   fishing: 'Fish bite faster',
   lumber: 'Lumberjacks chop faster',
+  smoke: 'Smokes faster',
 };
 
 // --- Station effects -------------------------------------------------------
@@ -36,6 +38,7 @@ export const mealPrice = (w: World) => MEAL_PRICE + 4 * (w.levels.hatch - 1);
 export const fishPace = (w: World) => 1 + 0.35 * (w.levels.fishing - 1);
 export const playerFishInterval = (w: World) => FISH_INTERVAL / fishPace(w);
 export const lumberPace = (w: World) => 1 + 0.35 * (w.levels.lumber - 1);
+export const smokeTime = (w: World) => SMOKE_TIME / (1 + 0.45 * (w.levels.smoke - 1));
 
 export function completeLevelPad(w: World, pad: Pad, station: StationId): void {
   w.levels[station]++;

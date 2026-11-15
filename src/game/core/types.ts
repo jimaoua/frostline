@@ -6,9 +6,9 @@ export interface Vec {
 }
 
 /** Things that physically ride on a back. Cash is shown separately. */
-export type Carryable = 'wood' | 'stone' | 'ore' | 'fish' | 'meal';
+export type Carryable = 'wood' | 'stone' | 'ore' | 'fish' | 'meal' | 'salmon' | 'smoked';
 export type ItemKind = Carryable | 'coin';
-export type QuadrantId = 'core' | 'east' | 'north';
+export type QuadrantId = 'core' | 'east' | 'north' | 'west';
 
 export type StructureId =
   | 'campfire'
@@ -26,7 +26,12 @@ export type StructureId =
   | 'tower1'
   | 'tower2'
   | 'workshop'
-  | 'shelter';
+  | 'shelter'
+  | 'smokehouse'
+  | 'market'
+  | 'marketMat'
+  | 'lakeCamp'
+  | 'tower3';
 
 export type UpgradeId = 'bonfire' | 'sharpAxes' | 'bigPacks' | 'ironArrows' | 'traps' | 'gatehouse';
 
@@ -47,10 +52,17 @@ export type PadId =
   | 'upHatch'
   | 'upFishing'
   | 'upLumber'
+  | 'expandWest'
+  | 'smokehouse'
+  | 'market'
+  | 'lakeCamp'
+  | 'upSmoke'
+  | 'porter'
+  | 'tower3'
   | UpgradeId;
 
 /** Stations that level up through their own upgrade pad. */
-export type StationId = 'grill' | 'hatch' | 'fishing' | 'lumber';
+export type StationId = 'grill' | 'hatch' | 'fishing' | 'lumber' | 'smoke';
 
 /**
  * Anything that walks. Facing is a SCREEN-space angle so the renderer can
@@ -87,7 +99,7 @@ export interface Player extends Mover {
   knockedT: number;
 }
 
-export type WorkerRole = 'lumberjack' | 'miner' | 'hauler' | 'fisher' | 'cook';
+export type WorkerRole = 'lumberjack' | 'miner' | 'hauler' | 'fisher' | 'cook' | 'icefisher' | 'porter';
 export type WorkerState = 'idle' | 'toNode' | 'working' | 'toDrop' | 'toPickup' | 'toSell' | 'wander' | 'huddle';
 
 export interface Worker extends Mover {
@@ -123,7 +135,7 @@ export interface Survivor extends Mover {
   idleT: number;
 }
 
-export type NodeKind = 'tree' | 'rock' | 'ore';
+export type NodeKind = 'tree' | 'rock' | 'ore' | 'icehole';
 
 export interface ResourceNode {
   id: number;
@@ -156,7 +168,8 @@ export type PadEffect =
   | { type: 'expand'; quadrant: QuadrantId }
   | { type: 'upgrade'; upgrade: UpgradeId }
   | { type: 'hire' }
-  | { type: 'level'; station: StationId };
+  | { type: 'level'; station: StationId }
+  | { type: 'hireRole'; role: WorkerRole };
 
 export type PadIcon =
   | 'hut' | 'expand' | 'trade' | 'pick' | 'tower' | 'gear' | 'home' | 'trap' | 'gate' | 'pack' | 'arrow' | 'person' | 'fish' | 'grill' | 'fire';
@@ -337,9 +350,14 @@ export interface Stats {
   mealsServed: number;
   rescued: number;
   cashCollected: number;
+  salmonCaught: number;
+  salmonSmoked: number;
+  smokedSold: number;
 }
 
 export interface Flags {
+  /** Chapter 2: the frozen lake west of the camp is revealed. */
+  lake: boolean;
   harvestWood: boolean;
   harvestStone: boolean;
   harvestOre: boolean;
@@ -395,6 +413,15 @@ export interface Kitchen {
   cash: number;
 }
 
+/** Chapter 2: salmon in, smoked fish out. */
+export interface Smokehouse {
+  raw: number;
+  /** Smoking progress (0..1) per rack; -1 = empty. */
+  slots: number[];
+  /** Smoked fish crates ready to carry to the market. */
+  ready: number;
+}
+
 export interface World {
   time: number;
   phase: number;
@@ -416,6 +443,9 @@ export interface World {
   kitchen: Kitchen;
   coins: number;
   coinPile: number;
+  smoke: Smokehouse;
+  /** Cash the market porter has earned, waiting on the market mat. */
+  marketCash: number;
   fire: { lit: boolean; fuel: number; litAt: number };
   defense: Defense;
   stats: Stats;

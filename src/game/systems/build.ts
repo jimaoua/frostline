@@ -2,6 +2,7 @@ import { DOOR_HP, HAULER_SPEED, WORKER_SPEED } from '../core/constants';
 import type { Pad, PadId, StructureId, UpgradeId, Vec, Worker, WorkerRole, World } from '../core/types';
 import { SPOTS } from '../world/layout';
 import { burst, celebrate, popup, ring } from './effects';
+import { revealLake } from './lake';
 import { addXp, completeLevelPad } from './levels';
 import { makeMover } from './motion';
 
@@ -42,11 +43,16 @@ export function completePad(w: World, pad: Pad): void {
       }
       syncGateDefenses(w);
       celebrate(w, pad.pos, `${pad.label} unlocked!`);
+      if (e.quadrant === 'west') revealLake(w);
       break;
     }
     case 'upgrade':
       applyUpgrade(w, e.upgrade);
       celebrate(w, pad.pos, UPGRADE_LABEL[e.upgrade]);
+      break;
+    case 'hireRole':
+      spawnWorker(w, e.role, { x: pad.pos.x, y: pad.pos.y });
+      celebrate(w, pad.pos, e.role === 'porter' ? 'Porter hired!' : 'New worker!');
       break;
     case 'hire':
       spawnWorker(w, w.rng() < 0.5 ? 'lumberjack' : 'hauler', { x: pad.pos.x, y: pad.pos.y });
@@ -100,8 +106,13 @@ export function buildStructure(w: World, id: StructureId): void {
     case 'quarryCamp':
       spawnWorker(w, 'miner', at(-1.0, 0.2));
       break;
+    case 'lakeCamp':
+      spawnWorker(w, 'icefisher', at(-0.6, 0.9));
+      spawnWorker(w, 'icefisher', at(0.6, 1.0));
+      break;
     case 'tower1':
     case 'tower2':
+    case 'tower3':
       w.towers.push({ id, pos: { ...s.pos }, cooldown: 0.5, aim: 0 });
       break;
     case 'shelter':
@@ -114,7 +125,7 @@ export function buildStructure(w: World, id: StructureId): void {
 }
 
 export function spawnWorker(w: World, role: WorkerRole, at: Vec): Worker {
-  const speed = role === 'hauler' || role === 'cook' ? HAULER_SPEED : WORKER_SPEED;
+  const speed = role === 'hauler' || role === 'cook' || role === 'porter' ? HAULER_SPEED : WORKER_SPEED;
   const wk: Worker = {
     ...makeMover(at, speed),
     id: w.nextId++,
@@ -123,11 +134,18 @@ export function spawnWorker(w: World, role: WorkerRole, at: Vec): Worker {
     route: [],
     nodeId: null,
     carry: [],
-    capacity: role === 'hauler' ? 6 : role === 'cook' ? 5 : role === 'fisher' ? 4 : 3,
+    capacity: role === 'hauler' || role === 'porter' ? 6 : role === 'cook' ? 5 : role === 'fisher' || role === 'icefisher' ? 4 : 3,
     workT: 0,
     swing: 0,
     idleT: 0.6 + w.rng() * 0.6,
-    home: role === 'fisher' || role === 'cook' ? { ...SPOTS.fishShack } : { ...at },
+    home:
+      role === 'fisher' || role === 'cook'
+        ? { ...SPOTS.fishShack }
+        : role === 'icefisher'
+          ? { ...SPOTS.lakeCamp }
+          : role === 'porter'
+            ? { ...SPOTS.market }
+            : { ...at },
     job: null,
   };
   w.workers.push(wk);

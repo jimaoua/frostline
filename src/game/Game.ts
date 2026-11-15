@@ -1,15 +1,17 @@
 import { audio } from '../platform/audio';
 import { haptic, type HapticKind } from '../platform/haptics';
 import { setSetting, settings, type Settings } from '../platform/settings';
+import { WAVE_INTERVAL } from './core/constants';
 import type { Sfx, World } from './core/types';
 import { deleteSave, hasSave, loadWorld, saveWorld } from './save';
 import { updateLevelPads } from './systems/levels';
+import { updateSmokehouse } from './systems/lake';
 import { buildHud, type HudSnapshot } from './hud';
 import { Input } from './input/input';
 import { startProgression, updateProgression } from './progression/phases';
 import { Renderer } from './render/renderer';
 import { updateDefense } from './systems/defense';
-import { updateEffects } from './systems/effects';
+import { burst, popup, updateEffects } from './systems/effects';
 import { updateEvents, updateWeather } from './systems/events';
 import { updatePlayerInteractions } from './systems/interact';
 import { updatePlayer } from './systems/player';
@@ -20,6 +22,8 @@ import { createWorld } from './world/createWorld';
 
 const HUD_INTERVAL = 0.12;
 const AUTOSAVE_EVERY = 8;
+/** Share of cash lost when the fire goes out (the camp itself is kept). */
+const RELIGHT_COST = 0.25;
 /** Away earnings: 10% of the recent income rate, for up to 4 hours away. */
 const AWAY_SHARE = 0.1;
 const AWAY_CAP_S = 4 * 3600;
@@ -111,6 +115,32 @@ export class Game {
     this.world = this.freshWorld();
     this.prevCoins = 0;
     this.renderer.snapCamera(this.world);
+    this.persist();
+    this.publish();
+  }
+
+  /**
+   * The fire went out: instead of wiping the camp (harsh on mobile), the
+   * survivors relight it. The raid is driven off, and the cost is a share of
+   * the cash and some morale.
+   */
+  relight(): void {
+    const w = this.world;
+    if (!w.gameOver) return;
+    const lost = Math.floor(w.coins * RELIGHT_COST);
+    w.coins -= lost;
+    w.gameOver = false;
+    w.wolves = w.wolves.filter((x) => x.mode !== 'raid');
+    w.defense.waveActive = false;
+    w.defense.health = Math.round(w.defense.maxHealth * 0.6);
+    w.defense.nextWaveIn = WAVE_INTERVAL;
+    w.morale = Math.max(0, w.morale - 15);
+    w.shake = 0.4;
+    const c = w.structures.campfire.pos;
+    burst(w, 'spark', c, 30, { color: ['#ffb02e', '#ffd34d', '#ff7a1f'], z: 14, speed: 1.8, up: 160, size: 2.4, life: 1 });
+    popup(w, c, 70, lost > 0 ? `Fire relit · -$${lost}` : 'Fire relit', '#ffcf7a', true);
+    w.sfx.push('fire');
+    this.prevCoins = w.coins;
     this.persist();
     this.publish();
   }
@@ -269,6 +299,7 @@ export class Game {
     updateLevelPads(w);
     updatePlayerInteractions(w, dt);
     updateKitchen(w, dt);
+    updateSmokehouse(w, dt);
     updateWorkers(w, dt);
     updateSurvivors(w, dt);
     updateDefense(w, dt);

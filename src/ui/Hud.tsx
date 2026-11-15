@@ -59,9 +59,9 @@ export function Hud({ game }: { game: Game }) {
         <div className="gameover">
           <div className="gameover__card">
             <h2>The fire went out</h2>
-            <p>The pack reached the camp. Rebuild and hold longer next time.</p>
-            <button type="button" onClick={() => game.reset()}>
-              Start again
+            <p>The pack scattered the camp and took a quarter of your cash. Your buildings and survivors are safe.</p>
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => game.relight()}>
+              Relight the fire
             </button>
           </div>
         </div>
