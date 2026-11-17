@@ -437,12 +437,12 @@ export class Renderer {
     // Price badges stay crisp and readable on top of everything, day or night.
     for (const pad of Object.values(w.pads)) {
       if (!pad.active && !pad.locked) continue;
-      // Building pads: the price sits at the pad's front edge, so the
-      // construction rising on the pad stays in full view.
-      const site = padHasSite(pad) && !pad.locked;
-      const h = site ? pad.size / 2 : 0;
-      const s = toScreen(pad.pos.x + h, pad.pos.y + h);
-      if (visible(s.x, s.y, 60)) drawPadBadge(ctx, w, pad, s.x, s.y, this.zoom, site);
+      // Building pads: the price floats above the plot, over the roof line,
+      // so it still marks where to stand but never hides the pad or the
+      // construction rising on it.
+      const lift = padHasSite(pad) && !pad.locked ? (pad.ghost?.h ?? 40) + 26 : 0;
+      const s = toScreen(pad.pos.x, pad.pos.y, lift);
+      if (visible(s.x, s.y, 60)) drawPadBadge(ctx, w, pad, s.x, s.y, this.zoom);
     }
 
     // Objective guide: a bouncing chevron over the target.
