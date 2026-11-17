@@ -1,8 +1,9 @@
 import { FIRE_WOOD_REQUIRED } from '../core/constants';
 import { clamp, easeOutBack } from '../core/math';
-import type { Pad, PadIcon, World } from '../core/types';
+import type { ItemKind, Pad, PadIcon, World } from '../core/types';
 import type { Rect } from '../world/layout';
-import { padBump, padShown } from '../systems/feel';
+import { padBump, padShown, padShownRatio } from '../systems/feel';
+import { padParts, type PartView } from '../systems/padcost';
 import { drawItem } from './items';
 import { onGround, roundRectPath } from './shapes';
 
@@ -166,8 +167,21 @@ function icon(ctx: Ctx, kind: PadIcon | 'lock'): void {
 /** Can the player finish (or at least feed) this pad right now? */
 export function padAffordance(w: World, pad: Pad): 'locked' | 'none' | 'some' | 'all' {
   if (pad.locked) return 'locked';
-  const remaining = pad.cost.amount - pad.paid;
-  const have = pad.cost.kind === 'coin' ? w.coins : w.player.carry.filter((c) => c === pad.cost.kind).length;
+  let any = false;
+  let all = true;
+  for (const part of padParts(pad)) {
+    const st = partAffordance(w, part.kind, part.amount - part.paid);
+    if (st === 'done') continue;
+    if (st !== 'none') any = true;
+    if (st !== 'all') all = false;
+  }
+  return all ? 'all' : any ? 'some' : 'none';
+}
+
+/** Can the player cover this one part with what they carry right now? */
+function partAffordance(w: World, kind: ItemKind, remaining: number): 'done' | 'none' | 'some' | 'all' {
+  if (remaining <= 0) return 'done';
+  const have = kind === 'coin' ? w.coins : w.player.carry.filter((c) => c === kind).length;
   return have <= 0 ? 'none' : have >= remaining ? 'all' : 'some';
 }
 
@@ -197,7 +211,7 @@ export function drawPad(ctx: Ctx, w: World, pad: Pad, sx: number, sy: number): v
     roundRectPath(ctx, -half, -half, half * 2, half * 2, 9);
     ctx.fillStyle = locked ? 'rgba(70,80,96,0.45)' : 'rgba(26,34,48,0.78)';
     ctx.fill();
-    const ratio = padShown(pad) / pad.cost.amount;
+    const ratio = padShownRatio(pad);
     if (ratio > 0 && !locked) {
       ctx.save();
       ctx.clip();
@@ -219,29 +233,79 @@ export function drawPad(ctx: Ctx, w: World, pad: Pad, sx: number, sy: number): v
   });
 }
 
-/** Text for a pad requirement: "150" for cash, "6/10" for materials. */
-export function padQuantity(pad: Pad): string {
-  const shown = padShown(pad);
-  return pad.cost.kind === 'coin' ? `${pad.cost.amount - shown}` : `${shown}/${pad.cost.amount}`;
+/** Text for one requirement: "150" left for cash, "6/10" delivered for materials. */
+export function partQuantity(pad: Pad, part: PartView): string {
+  const shown = padShown(pad, part.index);
+  return part.kind === 'coin' ? `${part.amount - shown}` : `${shown}/${part.amount}`;
 }
 
+const BADGE_FONT = '900 34px system-ui, -apple-system, "SF Pro Rounded", sans-serif';
+const ROW_H = 58;
+
 /**
- * The pad's requirement indicator: one huge resource icon and the quantity,
- * standing upright on the pad so it never shears with the floor. No names or
- * descriptions; those live in the mission card.
+ * The pad's requirements, standing upright on the pad so they never shear
+ * with the floor: one row per material (logs, stone, ore) and one for money,
+ * each with a big icon, a ring that fills as items land and the count
+ * ("6/10" delivered, or dollars still to pay). A finished row turns green.
+ * No names or descriptions; those live in the mission card.
  */
-export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: number, scale: number): void {
+export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: number, scale: number, below = false): void {
   const state = padAffordance(w, pad);
   const locked = state === 'locked';
   const appear = Math.max(0.01, easeOutBack(clamp((w.time - pad.activatedAt) / 0.5, 0, 1)));
-  const pulse = (state === 'all' ? 1 + Math.sin(w.time * 7) * 0.07 : 1) * padBump(pad, w.time);
-  const text = padQuantity(pad);
+  const k = appear * padBump(pad, w.time);
+  const parts = padParts(pad);
   ctx.save();
-  ctx.translate(sx, sy - 6);
-  ctx.scale((appear * pulse) / scale, (appear * pulse) / scale);
+  // Under a building pad the rows hang below its front edge, a little smaller.
+  const sc = below ? 0.82 : 1;
+  ctx.translate(sx, below ? sy + 26 : sy - 6);
+  ctx.scale((k * sc) / scale, (k * sc) / scale);
+  ctx.globalAlpha = locked ? 0.6 : 1;
+  // First part at the anchor; the rest stack upwards (or downwards when below).
+  parts.forEach((part, i) => {
+    const shown = padShown(pad, part.index);
+    const pst = locked ? 'locked' : shown >= part.amount ? 'done' : partAffordance(w, part.kind, part.amount - part.paid);
+    const y = below ? i * ROW_H : -(parts.length - 1 - i) * ROW_H;
+    drawBadgeRow(ctx, w, part.kind, shown >= part.amount ? '✓' : partQuantity(pad, part), shown / part.amount, pst, y);
+  });
 
-  const FONT = '900 34px system-ui, -apple-system, "SF Pro Rounded", sans-serif';
-  ctx.font = FONT;
+  // Level pads: a green "▲ LV 2" tag so upgrades read at a glance.
+  if (pad.level) {
+    const tag = `▲ LV ${pad.level}`;
+    const top = below ? 0 : -(parts.length - 1) * ROW_H;
+    ctx.font = '900 20px system-ui, -apple-system, sans-serif';
+    const lw = ctx.measureText(tag).width + 20;
+    roundRectPath(ctx, -lw / 2, top - 58, lw, 28, 14);
+    ctx.fillStyle = locked ? '#6b7686' : '#2fbf5f';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(8,12,20,0.6)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(tag, 0, top - 37);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawBadgeRow(
+  ctx: Ctx,
+  w: World,
+  kind: ItemKind,
+  text: string,
+  ratio: number,
+  state: 'locked' | 'done' | 'none' | 'some' | 'all',
+  y: number,
+): void {
+  const locked = state === 'locked';
+  const done = state === 'done';
+  const pulse = state === 'all' ? 1 + Math.sin(w.time * 7) * 0.07 : 1;
+  ctx.save();
+  ctx.translate(0, y);
+  ctx.scale(pulse, pulse);
+  ctx.font = BADGE_FONT;
   const tw = ctx.measureText(text).width;
   const iconW = 40;
   const gap = 6;
@@ -250,7 +314,7 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
 
   // Soft dark plate behind for contrast on bright snow and dark nights alike.
   roundRectPath(ctx, x0 - 12, -27, W + 24, 54, 27);
-  ctx.fillStyle = locked ? 'rgba(40,48,60,0.55)' : state === 'all' ? 'rgba(90,50,0,0.45)' : 'rgba(10,16,26,0.55)';
+  ctx.fillStyle = locked ? 'rgba(40,48,60,0.55)' : done ? 'rgba(20,90,45,0.6)' : state === 'all' ? 'rgba(90,50,0,0.45)' : 'rgba(10,16,26,0.55)';
   ctx.fill();
   if (state === 'all') {
     ctx.strokeStyle = `rgba(255,214,77,${0.6 + Math.sin(w.time * 7) * 0.4})`;
@@ -258,22 +322,20 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
     ctx.stroke();
   }
 
-  // Icon: drawn big, with a ring showing partial payment.
+  // Icon: drawn big, with a ring showing how much of this part has landed.
   const ix = x0 + iconW / 2;
-  ctx.globalAlpha = locked ? 0.6 : 1;
   ctx.beginPath();
   ctx.arc(ix, 0, 19, 0, Math.PI * 2);
   ctx.fillStyle = state === 'all' ? '#ffe9a0' : '#ffffff';
   ctx.fill();
-  const ratio = padShown(pad) / pad.cost.amount;
   if (ratio > 0 && !locked) {
     ctx.beginPath();
-    ctx.arc(ix, 0, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio);
+    ctx.arc(ix, 0, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, ratio));
     ctx.strokeStyle = '#2fbf5f';
     ctx.lineWidth = 4.5;
     ctx.stroke();
   }
-  drawItem(ctx, pad.cost.kind, ix, 0, 1.75);
+  drawItem(ctx, kind, ix, 0, 1.75);
   if (locked) {
     ctx.save();
     ctx.translate(ix + 13, 12);
@@ -287,7 +349,6 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
   }
 
   // Quantity: heavy, outlined, high contrast.
-  ctx.font = FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
@@ -299,6 +360,9 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
   if (locked) {
     fill.addColorStop(0, '#e2e7ee');
     fill.addColorStop(1, '#a9b3c1');
+  } else if (done) {
+    fill.addColorStop(0, '#d8ffe0');
+    fill.addColorStop(1, '#6fdc8c');
   } else if (state === 'all') {
     fill.addColorStop(0, '#fff6c4');
     fill.addColorStop(1, '#ffc93d');
@@ -311,23 +375,6 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
   }
   ctx.fillStyle = fill;
   ctx.fillText(text, tx, 2);
-
-  // Level pads: a green "▲ LV 2" tag so upgrades read at a glance.
-  if (pad.level) {
-    const tag = `▲ LV ${pad.level}`;
-    ctx.font = '900 20px system-ui, -apple-system, sans-serif';
-    const lw = ctx.measureText(tag).width + 20;
-    roundRectPath(ctx, -lw / 2, -58, lw, 28, 14);
-    ctx.fillStyle = locked ? '#6b7686' : '#2fbf5f';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(8,12,20,0.6)';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.textAlign = 'center';
-    ctx.fillText(tag, 0, -43);
-  }
-  ctx.globalAlpha = 1;
   ctx.restore();
 }
 

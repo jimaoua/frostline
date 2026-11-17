@@ -2,7 +2,8 @@ import { storage } from '../platform/storage';
 import type { World } from './core/types';
 import { PLAYER_CAPACITY } from './core/constants';
 import { migrateProgress } from './progression/phases';
-import { createWorld } from './world/createWorld';
+import { buildCostFor, createWorld } from './world/createWorld';
+import type { PadId } from './core/types';
 
 /**
  * Save games. The whole world is plain data except a few things that are
@@ -76,6 +77,7 @@ export function loadWorld(): LoadedSave | null {
     const lv = Math.min(w.camp?.level ?? 1, 12);
     const expected = PLAYER_CAPACITY + (w.upgrades.bigPacks ? 12 : 0) + 4 * Math.floor(lv / 3);
     w.player.capacity = Math.max(w.player.capacity, expected);
+    migratePadCosts(w);
     migrateProgress(w);
     return { world: w, awaySeconds: Math.max(0, (Date.now() - file.savedAt) / 1000) };
   } catch {
@@ -93,4 +95,21 @@ export function deleteSave(): void {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Stage 3 moved most building prices to materials + money. A pad an old save
+ * has not started gets the new price; a pad already part-paid keeps the price
+ * it was being paid in, so nothing anyone handed over is lost.
+ */
+function migratePadCosts(w: World): void {
+  for (const id of Object.keys(w.pads) as PadId[]) {
+    const pad = w.pads[id];
+    const next = buildCostFor(id);
+    if (!next || pad.completed) continue;
+    const started = pad.paid > 0 || (pad.parts ?? []).some((p) => p.paid > 0);
+    if (started) continue;
+    pad.cost = next.cost;
+    pad.parts = next.parts;
+  }
 }

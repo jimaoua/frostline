@@ -1,3 +1,4 @@
+import { surplus } from './padcost';
 import { FIRE_WARM_RADIUS, SELL_PRICE } from '../core/constants';
 import { dist } from '../core/math';
 import type { Carryable, NodeKind, ResourceNode, Vec, Worker, World } from '../core/types';
@@ -80,7 +81,9 @@ function chooseTask(w: World, wk: Worker, dt: number): void {
   const k = w.kitchen;
   switch (wk.role) {
     case 'hauler': {
-      const { wood, stone } = w.stock;
+      // Materials an open building still needs stay on the piles for the player.
+      const wood = surplus(w, 'wood');
+      const stone = surplus(w, 'stone');
       if (wood + stone > 0) {
         const from = stone >= wood ? w.structures.stonepile : w.structures.woodpile;
         if (from.built) {
@@ -312,9 +315,9 @@ function updateWorker(w: World, wk: Worker, dt: number): void {
         wk.state = 'toSell';
         break;
       }
-      const kind: Carryable = dist(wk.pos, w.structures.stonepile.pos) < dist(wk.pos, w.structures.woodpile.pos) ? 'stone' : 'wood';
+      const kind: 'wood' | 'stone' = dist(wk.pos, w.structures.stonepile.pos) < dist(wk.pos, w.structures.woodpile.pos) ? 'stone' : 'wood';
       const pile = kind === 'stone' ? w.structures.stonepile : w.structures.woodpile;
-      const n = Math.min(wk.capacity, w.stock[kind]);
+      const n = Math.min(wk.capacity, surplus(w, kind));
       if (n <= 0) {
         wk.state = 'idle';
         break;

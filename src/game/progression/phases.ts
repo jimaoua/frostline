@@ -6,6 +6,7 @@ import { addXp, showToast } from '../systems/levels';
 import { popup } from '../systems/effects';
 import { clearWestYard } from '../systems/lake';
 import { spawnStranded } from '../systems/settlement';
+import { isMulti, padParts, padRatio } from '../systems/padcost';
 import { SPOTS } from '../world/layout';
 
 /**
@@ -53,6 +54,25 @@ function nearestTree(w: World): Vec | null {
   return best;
 }
 
+/** Where to get a building material: its stockpile if workers filled it, else the nearest node. */
+function materialSource(w: World, kind: string): Vec | null {
+  if (kind === 'wood') return w.stock.wood > 0 && w.structures.woodpile.built ? w.structures.woodpile.pos : nearestTree(w);
+  const nodeKind = kind === 'stone' ? 'rock' : kind === 'ore' ? 'ore' : null;
+  if (!nodeKind) return null;
+  if (kind === 'stone' && w.stock.stone > 0 && w.structures.stonepile.built) return w.structures.stonepile.pos;
+  let best: Vec | null = null;
+  let bd = Infinity;
+  for (const n of w.nodes) {
+    if (n.kind !== nodeKind || !n.visible || n.amount <= 0) continue;
+    const d = dist(n.pos, w.player.pos);
+    if (d < bd) {
+      bd = d;
+      best = n.pos;
+    }
+  }
+  return best;
+}
+
 /** Where cash is waiting, if anywhere. */
 const cashTarget = (w: World): Vec | null =>
   w.kitchen.cash > 0
@@ -91,14 +111,27 @@ const padStep = (id: PadId, text: string, hint?: string, enter?: (w: World) => v
   pad: id,
   text: () => text,
   hint,
-  progress: (w) => [w.pads[id].paid, w.pads[id].cost.amount],
+  progress: (w) => {
+    const pad = w.pads[id];
+    // Materials + money: one overall percentage; a single price: paid/total.
+    return isMulti(pad) ? [Math.floor(padRatio(pad) * 100), 100] : [pad.paid, pad.cost.amount];
+  },
   target: (w) => {
     const pad = w.pads[id];
     if (target) {
       const t = target(w);
       if (t) return t;
     }
-    if (pad.cost.kind === 'coin' && w.coins < pad.cost.amount - pad.paid) return cashTarget(w) ?? pad.pos;
+    // Point at whatever is still missing: a material you are not carrying, then money.
+    for (const part of padParts(pad)) {
+      const left = part.amount - part.paid;
+      if (left <= 0) continue;
+      if (part.kind === 'coin') {
+        if (w.coins < left) return cashTarget(w) ?? pad.pos;
+      } else if (carrying(w, part.kind) === 0) {
+        return materialSource(w, part.kind) ?? pad.pos;
+      }
+    }
     return pad.pos;
   },
   enter: (w) => {

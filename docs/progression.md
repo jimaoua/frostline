@@ -68,3 +68,60 @@ Wolf packs now level off at 9 animals (and +5 toughness) so long games stay winn
 Saves from before Chapter 2 load normally: new buildings, pads and stats are
 merged in, and a save that was on the old "endless" step moves straight to
 Chapter 2's first mission.
+
+## Stage 3 — Materials and visible construction
+Buildings and expansions now take real materials plus some money. Station
+upgrades, hires and the optional shop pads keep their money price. Prices live
+in `BUILD_COSTS` (`world/createWorld.ts`). Before Stage 3, every price below
+was money only.
+
+| Pad | Before | Now |
+|---|---|---|
+| Fisher's Shack | $60 | 10 logs + $40 |
+| Bonfire | $80 | 12 logs + $40 |
+| Lumberjack Hut | $120 | 15 logs + $60 |
+| East Yard | $300 | 20 logs + $150 |
+| Quarry Camp | $200 | 20 logs + $100 |
+| North Yard | $600 | 20 logs + 15 stone + $250 |
+| Watchtower | $400 | 12 logs + 10 stone + $150 |
+| Second Watchtower | $600 | 12 stone + 3 ore + $200 |
+| Workshop | $500 | 20 logs + 15 stone + $200 |
+| Sharp Axes | $200 | 3 ore + $100 |
+| Shelter | $450 | 25 logs + 15 stone |
+| Gate Traps | $300 | 4 ore + $150 |
+| Gatehouse | $500 | 20 stone + 4 ore |
+| West Yard | $700 | 30 logs + 20 stone + $300 |
+| Lake Watchtower | $450 | 15 stone + 4 ore |
+| Smokehouse | $250 | 20 logs + $150 |
+| Fish Market | $350 | 25 logs + 10 stone + $200 |
+| Ice Fishers' Hut | $700 | 30 logs + 20 stone + $300 |
+
+* Stone is only asked for after the quarry opens (phase 4). Ore is only asked
+  for after the first ore run (phase 5).
+* Each pad shows one row per requirement: logs/stone/ore as "delivered/needed",
+  money as dollars still to pay. Each row has a ring that fills as items land
+  and turns green with a ✓ when done. The mission card shows one percentage.
+* What you carry is unloaded first, then money flies off your back. Progress
+  only counts what has landed. Walking off keeps everything delivered so far.
+* The player can take stone from the miners' stonepile while a pad still
+  needs stone.
+* Old saves: a pad that was not started gets the new price. A pad that was
+  already part-paid keeps its old money price, so nothing paid is lost.
+
+### Construction stages (13 buildings)
+Grill, Lumberjack Hut, Fisher's Shack, Trading Post, Quarry Camp, Workshop,
+Shelter, Smokehouse, Fish Market, Ice Fishers' Hut and the three watchtowers
+rise on their pad while you pay:
+
+1. **Foundations (0–25%):** a dirt patch, then a stone plinth spreads out,
+   with corner stakes.
+2. **Frame (25–60%):** scaffold posts climb and cross beams appear.
+3. **Walls (60–90%):** the real building rises inside the scaffold.
+4. **Finishing (90–100%):** walls reach the eaves. When the last item lands,
+   the roof goes on, the scaffold falls away and the building lands with a
+   bounce, confetti and the success haptic.
+
+Progress is weighted per unit: $1 = 1, log = 4, stone = 6, ore = 15. Every
+landing nudges the site. Each new stage pops it, throws dust and wood or stone
+chips, and plays the "stage" sound with a medium haptic. Expansions and
+upgrades take materials too, but have no construction stages yet.

@@ -6,7 +6,9 @@ import { SPOTS } from '../world/layout';
 import { completePad } from './build';
 import { addFlyer, burst, cashTopZ, popup, ring, sfx, stackTopZ } from './effects';
 import { iceSplash, lakeInteractions } from './lake';
-import { clearPadFeel, feel, padFeel, streak, streakGap, tally } from './feel';
+import { clearPadFeel, feel, padFeel, padShown, padShownRatio, stageOf, streak, streakGap, tally, trackPart } from './feel';
+import { addPaid, padFullyPaid, padParts } from './padcost';
+import { SITE_FINISH_FROM, SITE_STRUCTURES } from '../core/constants';
 
 const playerTarget = (w: World) => () => w.player.pos;
 /** Cash pad pile height cap (in bundles), matching the floor drawing. */
@@ -142,6 +144,19 @@ export function updatePlayerInteractions(w: World, dt: number): void {
     return;
   }
 
+  // Stonepile: the miners' stone, ready to carry to a construction site.
+  if (S.stonepile.built && dist(p.pos, S.stonepile.pos) < 0.95 && w.stock.stone > 0 && !full && wantsStone(w)) {
+    if (p.transferT <= 0) {
+      const st = streak(w, 'stonepile', () => 1);
+      w.stock.stone--;
+      p.carry.push('stone');
+      p.transferT = streakGap(st.n, 0.09, 0.04);
+      S.stonepile.bumpAt = w.time;
+      addFlyer(w, 'stone', S.stonepile.pos, 12, playerTarget(w), stackTopZ(p.carry.length), 0.3, 18);
+    }
+    return;
+  }
+
   // Trade mat: sell raw goods, pick up the hauler's earnings.
   if (S.tradeMat.built && dist(p.pos, S.tradeMat.pos) < 1.0) {
     if (p.transferT > 0) return;
@@ -218,64 +233,104 @@ function igniteFire(w: World): void {
 function payPad(w: World, pad: Pad): void {
   const p = w.player;
   if (p.transferT > 0) return;
-  const remaining = pad.cost.amount - pad.paid;
-  if (remaining <= 0) return; // the last items are still in the air
   // A short beat after stepping on, so walking across a pad never spends by accident.
   if (w.time - feel(w).padSince < 0.2) return;
-  padFeel(pad); // start tracking what has landed before `paid` moves on
-  if (pad.cost.kind === 'coin') {
-    if (w.coins <= 0) return;
-    const st = streak(w, `pad:${pad.id}`, () => Math.ceil(pad.cost.amount / 25));
-    const chunk = Math.min(remaining, w.coins, st.chunk);
-    const fromZ = cashTopZ(w.coins);
-    w.coins -= chunk;
-    pad.paid += chunk;
-    addFlyer(w, 'coin', p.pos, fromZ, pad.pos, 2, 0.24, 30, () => landOnPad(w, pad, chunk));
-    p.transferT = streakGap(st.n, 0.06, 0.015, 0.8);
-  } else {
-    const idx = p.carry.lastIndexOf(pad.cost.kind as Carryable);
-    if (idx < 0) return;
-    const st = streak(w, `pad:${pad.id}`, () => 1);
+  // Materials in your arms go first, then money from your back.
+  for (const part of padParts(pad)) {
+    const remaining = part.amount - part.paid;
+    if (remaining <= 0) continue;
+    if (part.kind === 'coin') {
+      if (w.coins <= 0) continue;
+      trackPart(pad, part.index); // before `paid` moves on
+      const st = streak(w, `pad:${pad.id}:${part.index}`, () => Math.ceil(part.amount / 25));
+      const chunk = Math.min(remaining, w.coins, st.chunk);
+      const fromZ = cashTopZ(w.coins);
+      w.coins -= chunk;
+      addPaid(pad, part.index, chunk);
+      addFlyer(w, 'coin', p.pos, fromZ, pad.pos, 2, 0.24, 30, () => landOnPad(w, pad, part.index, chunk));
+      p.transferT = streakGap(st.n, 0.06, 0.015, 0.8);
+      return;
+    }
+    const idx = p.carry.lastIndexOf(part.kind as Carryable);
+    if (idx < 0) continue;
+    trackPart(pad, part.index);
+    const st = streak(w, `pad:${pad.id}:${part.index}`, () => 1);
     p.carry.splice(idx, 1);
-    pad.paid++;
-    addFlyer(w, pad.cost.kind, p.pos, stackTopZ(p.carry.length), pad.pos, 2, 0.26, pad.cost.kind === 'stone' || pad.cost.kind === 'ore' ? 16 : 24, () =>
-      landOnPad(w, pad, 1),
-    );
-    p.transferT = streakGap(st.n, 0.09, 0.035);
+    addPaid(pad, part.index, 1);
+    // Heavy things fly lower and land with a thud; logs toss higher.
+    const heavy = part.kind === 'stone' || part.kind === 'ore';
+    addFlyer(w, part.kind, p.pos, stackTopZ(p.carry.length), pad.pos, 2, heavy ? 0.28 : 0.26, heavy ? 16 : 26, () => landOnPad(w, pad, part.index, 1));
+    p.transferT = streakGap(st.n, 0.08, 0.03);
+    return;
   }
+}
+
+/** Where a pad's building rises (its build structures, else the pad itself). */
+function sitePoints(w: World, pad: Pad): Vec[] {
+  if (pad.effect.type !== 'build') return [pad.pos];
+  return pad.effect.structures.filter((id) => SITE_STRUCTURES.has(id)).map((id) => w.structures[id].pos);
 }
 
 /**
  * Something paid has reached the pad: the fill rises by exactly that much,
- * the pad squashes, and quarter marks get their own little beat. The pad
- * completes when the last item lands, not when it leaves your hands.
+ * the pad squashes, and each construction stage (foundations, frame, walls)
+ * gets its own beat. The pad completes when the last item lands, not when it
+ * leaves your hands.
  */
-function landOnPad(w: World, pad: Pad, amount: number): void {
+function landOnPad(w: World, pad: Pad, index: number, amount: number): void {
   const pf = padFeel(pad);
-  const before = pf.shown / pad.cost.amount;
-  pf.shown = Math.min(pad.paid, pf.shown + amount);
+  const before = padShownRatio(pad);
+  pf.shown.set(index, padShown(pad, index) + amount);
   pf.bumpAt = w.time;
-  const after = pf.shown / pad.cost.amount;
-  burst(w, 'spark', pad.pos, 2, { color: pad.cost.kind === 'coin' ? '#9cf5a8' : '#ffe08a', z: 4, speed: 0.7, up: 55, size: 1.6, life: 0.35 });
-  if (after < 1 && Math.floor(after * 4) > Math.floor(before * 4)) {
-    ring(w, pad.pos, pad.size * 0.75, '#ffe58a', 0.35);
-    burst(w, 'puff', pad.pos, 4, { color: '#ffffff', z: 4, speed: 0.9, up: 18, size: 6, life: 0.5 });
+  const after = padShownRatio(pad);
+  const kind = index < 0 ? pad.cost.kind : (pad.parts?.[index]?.kind ?? 'coin');
+  burst(w, 'spark', pad.pos, 2, { color: kind === 'coin' ? '#9cf5a8' : '#ffe08a', z: 4, speed: 0.7, up: 55, size: 1.6, life: 0.35 });
+  if (kind !== 'coin') burst(w, 'puff', pad.pos, 1, { color: '#f4f8fc', z: 4, speed: 0.6, up: 14, size: 5, life: 0.35 });
+  const st = stageOf(after);
+  if (after < 1 && st > stageOf(before)) {
+    pf.stage = st;
+    pf.stageAt = w.time;
+    for (const at of sitePoints(w, pad)) {
+      ring(w, at, pad.size * 0.85, '#ffe58a', 0.4);
+      burst(w, 'puff', at, 7, { color: ['#ffffff', '#e9e1d4'], z: 6, speed: 1.2, up: 22, size: 7, life: 0.6 });
+      burst(w, 'chip', at, 5, { color: st >= 2 ? ['#9aa6b4', '#c6ced8'] : ['#c9874e', '#e2a96f'], z: 26, speed: 1.1, up: 110, size: 2.4, life: 0.6 });
+    }
+    w.shake = Math.max(w.shake, 0.12);
     sfx(w, 'stage');
   }
-  if (pf.shown >= pad.cost.amount && pad.paid >= pad.cost.amount && pad.active && !pad.completed) {
-    clearPadFeel(pad);
-    completePad(w, pad);
+  if (after >= 1 && padFullyPaid(pad) && pad.active && !pad.completed) finishPad(w, pad);
+}
+
+function finishPad(w: World, pad: Pad): void {
+  clearPadFeel(pad);
+  completePad(w, pad);
+  if (pad.effect.type !== 'build') return;
+  // The site was already walls-high: the finished building picks up from
+  // there (roof goes on, scaffold falls away, it lands with a bounce).
+  for (const id of pad.effect.structures) {
+    if (!SITE_STRUCTURES.has(id)) continue;
+    const s = w.structures[id];
+    s.builtAt = w.time - SITE_FINISH_FROM;
+    burst(w, 'puff', s.pos, 12, { color: ['#ffffff', '#e9e1d4'], z: 4, speed: 2, up: 16, size: 9, life: 0.8 });
+    burst(w, 'chip', s.pos, 10, { color: ['#c9874e', '#e2a96f', '#9aa6b4'], z: 40, speed: 1.6, up: 150, size: 2.6, life: 0.8 });
   }
 }
 
 /** A save made while the last items were in flight: finish the pad on load. */
 export function settlePaidPads(w: World): void {
   for (const pad of Object.values(w.pads)) {
-    if (pad.active && !pad.completed && pad.paid >= pad.cost.amount) {
-      clearPadFeel(pad);
-      completePad(w, pad);
-    }
+    if (pad.active && !pad.completed && padFullyPaid(pad)) finishPad(w, pad);
   }
+}
+
+/** Only pick stone off the pile while some open pad still needs stone. */
+function wantsStone(w: World): boolean {
+  const have = w.player.carry.filter((c) => c === 'stone').length;
+  for (const pad of Object.values(w.pads)) {
+    if (!pad.active || pad.completed) continue;
+    for (const part of padParts(pad)) if (part.kind === 'stone' && part.amount - part.paid > have) return true;
+  }
+  return false;
 }
 
 function canHarvest(w: World, n: ResourceNode): boolean {

@@ -1,13 +1,14 @@
 
 import { toScreen } from '../core/iso';
 import { clamp, damp } from '../core/math';
-import type { StructureId, World } from '../core/types';
+import type { Pad, StructureId, World } from '../core/types';
 import type { Input } from '../input/input';
 import { nightAmount, warmRadius } from '../systems/settlement';
 import { windVec } from '../systems/effects';
 import { QUADRANTS, SPOTS } from '../world/layout';
 import { drawHuman, drawWolf } from './characters';
-import { stackSquash } from '../systems/feel';
+import { padBumpAt, padShownRatio, padStageAt, stackSquash } from '../systems/feel';
+import { SITE_STRUCTURES } from '../core/constants';
 import { drawExpandZone, drawFireRing, drawPad, drawPadBadge, drawWarmZone } from './floor';
 import { drawArrows, drawFireGlow, drawFlyers, drawFootprints, drawParticles, drawPopups, Snowfall } from './fx';
 import { drawBaseEdges, drawGround, type View } from './ground';
@@ -38,6 +39,8 @@ import {
   drawTrap,
   drawWorkshop,
   sledPos,
+  withSite,
+  type SiteState,
 } from './structures';
 
 interface Drawable {
@@ -214,7 +217,9 @@ export class Renderer {
     }
 
     for (const st of Object.values(S)) {
-      if (!st.built) continue;
+      // Not built yet, but being paid for: draw it as a construction site.
+      const site = st.built ? null : siteFor(w, st.id);
+      if (!st.built && !site) continue;
       const s = toScreen(st.pos.x, st.pos.y);
       if (!visible(s.x, s.y, 240)) continue;
       const depth = st.pos.x + st.pos.y;
@@ -277,7 +282,7 @@ export class Renderer {
         case 'tower1':
         case 'tower2':
         case 'tower3': {
-          const t = w.towers.find((x) => x.id === st.id);
+          const t = w.towers.find((x) => x.id === st.id) ?? (site ? { id: st.id, pos: st.pos, cooldown: 0, aim: 0 } : undefined);
           if (t) draw = () => drawTower(ctx, t, s.x, s.y, time, b, night);
           dd = 0.2;
           break;
@@ -285,11 +290,16 @@ export class Renderer {
         default:
           break;
       }
-      if (draw) items.push({ depth: depth + dd, draw });
+      if (draw && site) {
+        const d = draw;
+        items.push({ depth: depth + dd, draw: () => withSite(site, d) });
+      } else if (draw) items.push({ depth: depth + dd, draw });
     }
 
     for (const pad of Object.values(w.pads)) {
       if (!pad.active || !pad.ghost) continue;
+      // Once the first item lands, the site replaces the blueprint.
+      if (padShownRatio(pad) > 0 && padHasSite(pad)) continue;
       const s = toScreen(pad.ghost.at.x, pad.ghost.at.y);
       items.push({ depth: pad.ghost.at.x + pad.ghost.at.y + 0.3, draw: () => drawGhost(ctx, pad, s.x, s.y, time) });
     }
@@ -427,8 +437,12 @@ export class Renderer {
     // Price badges stay crisp and readable on top of everything, day or night.
     for (const pad of Object.values(w.pads)) {
       if (!pad.active && !pad.locked) continue;
-      const s = toScreen(pad.pos.x, pad.pos.y);
-      if (visible(s.x, s.y, 60)) drawPadBadge(ctx, w, pad, s.x, s.y, this.zoom);
+      // Building pads: the price sits at the pad's front edge, so the
+      // construction rising on the pad stays in full view.
+      const site = padHasSite(pad) && !pad.locked;
+      const h = site ? pad.size / 2 : 0;
+      const s = toScreen(pad.pos.x + h, pad.pos.y + h);
+      if (visible(s.x, s.y, 60)) drawPadBadge(ctx, w, pad, s.x, s.y, this.zoom, site);
     }
 
     // Objective guide: a bouncing chevron over the target.
@@ -599,4 +613,27 @@ function drawTapHand(ctx: CanvasRenderingContext2D, x: number, y: number, time: 
   ctx.lineWidth = 3;
   ctx.stroke();
   ctx.restore();
+}
+
+const padHasSite = (pad: Pad) => pad.effect.type === 'build' && pad.effect.structures.some((id) => SITE_STRUCTURES.has(id));
+
+/** The pad that builds each structure (pads never change, so look it up once). */
+const builders = new WeakMap<World, Map<StructureId, Pad>>();
+
+/** Construction-site state for an unbuilt structure whose pad is being paid. */
+function siteFor(w: World, id: StructureId): SiteState | null {
+  if (!SITE_STRUCTURES.has(id)) return null;
+  let map = builders.get(w);
+  if (!map) {
+    map = new Map();
+    for (const pad of Object.values(w.pads)) {
+      if (pad.effect.type === 'build') for (const sid of pad.effect.structures) map.set(sid, pad);
+    }
+    builders.set(w, map);
+  }
+  const pad = map.get(id);
+  if (!pad || pad.completed) return null;
+  const q = padShownRatio(pad);
+  if (q <= 0) return null;
+  return { q, stageAt: padStageAt(pad), bumpAt: padBumpAt(pad) };
 }

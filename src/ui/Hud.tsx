@@ -96,7 +96,7 @@ function ObjectiveCard({ hud }: { hud: HudSnapshot }) {
         <span className="objective__line">{hud.objective}</span>
         {hud.progress && (
           <b key={hud.progress.value} className="bump">
-            {hud.progress.value}/{hud.progress.total}
+            {hud.progress.percent ? `${hud.progress.value}%` : `${hud.progress.value}/${hud.progress.total}`}
           </b>
         )}
         <i className="objective__chev objective__chev--down" />
@@ -125,7 +125,7 @@ function ObjectiveCard({ hud }: { hud: HudSnapshot }) {
             <span style={{ width: `${pct}%` }} />
           </div>
           <b key={hud.progress.value} className="bump">
-            {hud.progress.value}/{hud.progress.total}
+            {hud.progress.percent ? `${hud.progress.value}%` : `${hud.progress.value}/${hud.progress.total}`}
           </b>
         </div>
       )}

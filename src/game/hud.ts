@@ -1,4 +1,5 @@
-import type { World } from './core/types';
+import type { Pad, World } from './core/types';
+import { isMulti } from './systems/padcost';
 import { currentObjective } from './progression/phases';
 import { EVENT_INFO } from './systems/events';
 import { residents } from './systems/settlement';
@@ -12,7 +13,7 @@ export interface HudSnapshot {
   stepCount: number;
   objective: string;
   hint?: string;
-  progress?: { value: number; total: number };
+  progress?: { value: number; total: number; percent?: boolean };
   resources?: { coins: number; wood: number; stone: number };
   morale?: { value: number; residents: number };
   defense?: { health: number; maxHealth: number; wave: number; nextWaveIn: number | null; wolves: number };
@@ -40,7 +41,9 @@ export function buildHud(w: World): HudSnapshot {
     stepCount: o.stepCount,
     objective: o.text,
     hint: o.hint,
-    progress: o.progress ? { value: Math.floor(o.progress[0]), total: o.progress[1] } : undefined,
+    progress: o.progress
+      ? { value: Math.floor(o.progress[0]), total: o.progress[1], percent: isMultiStep(w, o.stepId) }
+      : undefined,
     resources: w.flags.showResources ? { coins: Math.floor(w.coins), wood: w.stock.wood, stone: w.stock.stone } : undefined,
     morale: w.flags.showMorale ? { value: Math.round(w.morale), residents: residents(w) } : undefined,
     defense: w.defense.visible
@@ -67,4 +70,10 @@ export function buildHud(w: World): HudSnapshot {
     dragHint: w.phase === 1 && w.tutorial.moved < 1.5,
     gameOver: w.gameOver,
   };
+}
+
+/** Pads that take several materials report one overall percentage. */
+function isMultiStep(w: World, stepId: string): boolean {
+  const pad = (w.pads as Record<string, Pad | undefined>)[stepId];
+  return !!pad && isMulti(pad);
 }

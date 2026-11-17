@@ -1,8 +1,9 @@
 import { screenDirToWorldDir } from '../core/iso';
+import { BUILD_TIME } from '../core/constants';
 import { clamp } from '../core/math';
 import type { Caravan, GateDoor, Kitchen, Pad, Trap, Tower, Vec, World } from '../core/types';
 import type { GateDef } from '../world/layout';
-import { padShown } from '../systems/feel';
+import { padShownRatio } from '../systems/feel';
 import { drawItem } from './items';
 import { C } from './palette';
 import {
@@ -25,7 +26,6 @@ import {
 
 type Ctx = CanvasRenderingContext2D;
 
-const BUILD_TIME = 0.9;
 
 /** Squash factor when something receives an item. */
 export function bumpScale(bumpAt: number, time: number): number {
@@ -33,14 +33,157 @@ export function bumpScale(bumpAt: number, time: number): number {
   return t >= 1 || t < 0 ? 1 : 1 - Math.sin(t * Math.PI) * 0.1;
 }
 
+/** A building being paid for on its pad: progress 0..1 and its last beats. */
+export interface SiteState {
+  q: number;
+  stageAt: number;
+  bumpAt: number;
+}
+
+let SITE: SiteState | null = null;
+
+/**
+ * Draw a structure as a construction site instead of a finished building.
+ * Every building's own draw function goes through `withBuild`, which checks
+ * this, so one site renderer serves all of them.
+ */
+export function withSite(site: SiteState, draw: () => void): void {
+  SITE = site;
+  try {
+    draw();
+  } finally {
+    SITE = null;
+  }
+}
+
+const SCAFFOLD = '#a8693c';
+
+/** Scaffold posts on the three visible corners, with cross beams below `postH`. */
+function scaffold(ctx: Ctx, foot: number, postH: number, alpha = 1): void {
+  if (postH <= 0) return;
+  ctx.globalAlpha = alpha;
+  const corners = [rel(-foot, foot), rel(foot, foot), rel(foot, -foot)];
+  ctx.strokeStyle = '#6e4224';
+  ctx.lineWidth = 4;
+  for (const c of corners) {
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y);
+    ctx.lineTo(c.x, c.y - postH);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = SCAFFOLD;
+  ctx.lineWidth = 2.5;
+  for (const c of corners) {
+    ctx.beginPath();
+    ctx.moveTo(c.x, c.y);
+    ctx.lineTo(c.x, c.y - postH);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 2;
+  for (let z = 14; z < postH - 2; z += 16) {
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y - z);
+    ctx.lineTo(corners[1].x, corners[1].y - z);
+    ctx.lineTo(corners[2].x, corners[2].y - z);
+    ctx.stroke();
+  }
+  // Diagonal brace on the front face once the frame is tall enough.
+  if (postH > 24) {
+    ctx.beginPath();
+    ctx.moveTo(corners[0].x, corners[0].y - 2);
+    ctx.lineTo(corners[1].x, corners[1].y - Math.min(postH - 4, 40));
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * The site in four stages, growing smoothly with what has landed on the pad:
+ *  1. Foundations (0–25 %): a dirt patch, then a stone plinth spreading out.
+ *  2. Frame (25–60 %): scaffold posts climb and beams appear between them.
+ *  3. Walls (60–90 %): the real building rises inside the scaffold.
+ *  4. Finishing (90–100 %): walls reach the eaves; the roof goes on when the
+ *     last item lands (the finished building then takes over).
+ * Each stage change pops the whole site; every landing gives it a nudge.
+ */
+function drawSite(ctx: Ctx, site: SiteState, time: number, height: number, foot: number, draw: () => void): void {
+  const q = site.q;
+  const ps = (time - site.stageAt) / 0.32;
+  const pop = ps >= 0 && ps < 1 ? Math.sin(ps * Math.PI) * 0.1 * (1 - ps) : 0;
+  const bs = (time - site.bumpAt) / 0.14;
+  const nudge = bs >= 0 && bs < 1 ? Math.sin(bs * Math.PI) * 0.025 : 0;
+  const sq = 1 + pop + nudge;
+  ctx.scale(1 / sq, sq);
+
+  // 1. Foundations.
+  const k1 = clamp(q / 0.25, 0, 1);
+  const pad = foot * 2 + 0.2;
+  ctx.fillStyle = 'rgba(120,92,66,0.45)';
+  const g = [rel(-pad / 2, -pad / 2), rel(pad / 2, -pad / 2), rel(pad / 2, pad / 2), rel(-pad / 2, pad / 2)];
+  ctx.beginPath();
+  ctx.moveTo(g[0].x, g[0].y);
+  for (const pt of g.slice(1)) ctx.lineTo(pt.x, pt.y);
+  ctx.closePath();
+  ctx.fill();
+  const plinth = foot * 2 * (0.35 + 0.65 * k1);
+  prism(ctx, 0, 0, plinth, plinth, 3 + 4 * k1, 0, {
+    left: '#8d97a3',
+    right: '#6d7783',
+    top: '#b9c2cc',
+    stroke: 'rgba(40,48,60,0.5)',
+  });
+  // Corner stakes go in as the foundation spreads.
+  ctx.fillStyle = '#7a4a28';
+  for (const [x, y] of [[-1, 1], [1, 1], [1, -1], [-1, -1]] as const) {
+    const c = rel((x * plinth) / 2, (y * plinth) / 2, 7 * k1);
+    ctx.fillRect(c.x - 1.5, c.y - 6 * k1, 3, 6 * k1);
+  }
+
+  // 2. Frame rises (back of the scaffold first, so walls sit inside it).
+  const k2 = clamp((q - 0.25) / 0.35, 0, 1);
+  const postH = (height + 10) * (1 - (1 - k2) * (1 - k2));
+  if (postH > 0) {
+    const back = rel(-foot, -foot);
+    ctx.strokeStyle = SCAFFOLD;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(back.x, back.y);
+    ctx.lineTo(back.x, back.y - postH);
+    ctx.stroke();
+  }
+
+  // 3–4. Walls: the real building, revealed from the ground up.
+  const k3 = clamp((q - 0.6) / 0.3, 0, 1);
+  const k4 = clamp((q - 0.9) / 0.1, 0, 1);
+  const wallH = k3 > 0 ? 6 + height * (0.72 * k3 + 0.1 * k4) : 0;
+  if (wallH > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-220, -wallH + 6, 440, wallH + 120);
+    ctx.clip();
+    draw();
+    ctx.restore();
+    // Fresh top edge of the wall catches the light.
+    ctx.fillStyle = 'rgba(255,240,200,0.35)';
+    ctx.fillRect(-60, -wallH + 5, 120, 2);
+  }
+  scaffold(ctx, foot, postH);
+}
+
 /**
  * Construction: scaffolding rises and the building is revealed from the
- * ground up, then lands with a squashy bounce.
+ * ground up, then lands with a squashy bounce. While a site is set, the
+ * structure is drawn as that construction site instead.
  */
 export function withBuild(ctx: Ctx, builtAt: number, time: number, height: number, foot: number, sx: number, sy: number, draw: () => void): void {
-  const t = (time - builtAt) / BUILD_TIME;
   ctx.save();
   ctx.translate(sx, sy);
+  if (SITE) {
+    drawSite(ctx, SITE, time, height, foot, draw);
+    ctx.restore();
+    return;
+  }
+  const t = (time - builtAt) / BUILD_TIME;
   if (t < 1) {
     const reveal = clamp(t * 1.15, 0, 1);
     const h = reveal * (height + 30);
@@ -50,29 +193,12 @@ export function withBuild(ctx: Ctx, builtAt: number, time: number, height: numbe
     ctx.clip();
     draw();
     ctx.restore();
-    // Scaffold frame.
-    ctx.globalAlpha = 1 - clamp((t - 0.6) / 0.4, 0, 1);
-    ctx.strokeStyle = '#a8693c';
-    ctx.lineWidth = 2;
-    const corners = [rel(-foot, foot), rel(foot, foot), rel(foot, -foot)];
-    for (const c of corners) {
-      ctx.beginPath();
-      ctx.moveTo(c.x, c.y);
-      ctx.lineTo(c.x, c.y - height - 10);
-      ctx.stroke();
-    }
-    for (let z = 14; z < height; z += 16) {
-      ctx.beginPath();
-      ctx.moveTo(corners[0].x, corners[0].y - z);
-      ctx.lineTo(corners[1].x, corners[1].y - z);
-      ctx.lineTo(corners[2].x, corners[2].y - z);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
+    scaffold(ctx, foot, height + 10, 1 - clamp((t - 0.6) / 0.4, 0, 1));
   } else {
-    const k = (time - builtAt - BUILD_TIME) / 0.35;
+    const k = (time - builtAt - BUILD_TIME) / 0.4;
     if (k < 1) {
-      const sq = 1 + Math.sin(k * Math.PI) * 0.09 * (1 - k);
+      // Lands with a bounce: squash, overshoot, settle.
+      const sq = 1 + Math.sin(k * Math.PI * 1.5) * 0.12 * (1 - k);
       ctx.scale(1 / sq, sq);
     }
     draw();
@@ -778,7 +904,7 @@ export function drawGhost(ctx: Ctx, pad: Pad, sx: number, sy: number, time: numb
   if (!pad.ghost) return;
   const g = pad.ghost;
   const pulse = 0.5 + Math.sin(time * 3) * 0.5;
-  const ratio = padShown(pad) / pad.cost.amount;
+  const ratio = padShownRatio(pad);
   ctx.save();
   ctx.translate(sx, sy);
   ctx.globalAlpha = 0.28 + pulse * 0.12 + ratio * 0.25;

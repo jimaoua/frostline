@@ -1,6 +1,6 @@
 import { DAY_LENGTH, GRILL_SLOTS, MORALE_START, PLAYER_CAPACITY, PLAYER_HP, PLAYER_SPEED, SMOKE_SLOTS } from '../core/constants';
 import { mulberry32 } from '../core/math';
-import type { Ghost, ItemKind, Pad, PadEffect, PadIcon, PadId, Player, Stats, Structure, StructureId, Vec, World } from '../core/types';
+import type { Ghost, ItemKind, Pad, PadEffect, PadIcon, PadId, PadPart, Player, Stats, Structure, StructureId, Vec, World } from '../core/types';
 import { makeMover } from '../systems/motion';
 import { BaseLayout } from './base';
 import { SPOTS, generateNodes } from './layout';
@@ -76,7 +76,7 @@ export function createWorld(seed = 7): World {
   };
   const S = SPOTS;
 
-  return {
+  const w: World = {
     time: 0,
     phase: 1,
     stepIndex: 0,
@@ -198,4 +198,53 @@ export function createWorld(seed = 7): World {
     hitstop: 0,
     flash: 0,
   };
+  applyBuildCosts(w);
+  return w;
+}
+
+
+/**
+ * Construction prices: buildings and expansions take real materials plus
+ * some money (Stage 3 of the design doc). Station upgrades, hires and the
+ * optional shop pads keep their money price. A material is only asked for
+ * once it can be gathered (stone after the quarry opens, ore after the first
+ * ore run).
+ */
+export const BUILD_COSTS: Partial<Record<PadId, { coin?: number; wood?: number; stone?: number; ore?: number }>> = {
+  fishShack: { wood: 10, coin: 40 },
+  bonfire: { wood: 12, coin: 40 },
+  lumberHut: { wood: 15, coin: 60 },
+  expandEast: { wood: 20, coin: 150 },
+  quarryCamp: { wood: 20, coin: 100 },
+  expandNorth: { wood: 20, stone: 15, coin: 250 },
+  tower1: { wood: 12, stone: 10, coin: 150 },
+  tower2: { stone: 12, ore: 3, coin: 200 },
+  workshop: { wood: 20, stone: 15, coin: 200 },
+  sharpAxes: { ore: 3, coin: 100 },
+  shelter: { wood: 25, stone: 15 },
+  traps: { ore: 4, coin: 150 },
+  gatehouse: { stone: 20, ore: 4 },
+  expandWest: { wood: 30, stone: 20, coin: 300 },
+  tower3: { stone: 15, ore: 4 },
+  smokehouse: { wood: 20, coin: 150 },
+  market: { wood: 25, stone: 10, coin: 200 },
+  lakeCamp: { wood: 30, stone: 20, coin: 300 },
+};
+
+/** The price a pad has in this version (used for new games and to update old saves). */
+export function buildCostFor(id: PadId): { cost: Pad['cost']; parts: PadPart[] } | null {
+  const c = BUILD_COSTS[id];
+  if (!c) return null;
+  const mats: PadPart[] = (['wood', 'stone', 'ore'] as const).filter((k) => (c[k] ?? 0) > 0).map((k) => ({ kind: k, amount: c[k]!, paid: 0 }));
+  if (c.coin) return { cost: { kind: 'coin', amount: c.coin }, parts: mats };
+  const [first, ...rest] = mats;
+  return { cost: { kind: first.kind, amount: first.amount }, parts: rest };
+}
+
+function applyBuildCosts(w: World): void {
+  for (const id of Object.keys(BUILD_COSTS) as PadId[]) {
+    const c = buildCostFor(id)!;
+    w.pads[id].cost = c.cost;
+    w.pads[id].parts = c.parts;
+  }
 }

@@ -187,8 +187,11 @@ export interface Pad {
   icon: PadIcon;
   pos: Vec;
   size: number;
+  /** Main price (money when the pad takes money, else its first material). */
   cost: { kind: ItemKind; amount: number };
   paid: number;
+  /** Extra materials the pad also needs (logs, stone, ore), each paid separately. */
+  parts?: PadPart[];
   active: boolean;
   /** Shown greyed-out as "next unlock" before it can be paid. */
   locked: boolean;
@@ -259,6 +262,12 @@ export interface Footprint {
   age: number;
   paw: boolean;
   big: boolean;
+}
+
+export interface PadPart {
+  kind: ItemKind;
+  amount: number;
+  paid: number;
 }
 
 export interface Flyer {

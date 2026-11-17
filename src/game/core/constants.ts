@@ -58,3 +58,27 @@ export const DOOR_HP = 24;
 export const FIRE_WARM_RADIUS = 2.6;
 export const DAY_LENGTH = 180;
 export const MORALE_START = 70;
+
+/** Seconds a finished building takes to rise when built in one go. */
+export const BUILD_TIME = 0.9;
+/**
+ * A building finished on its construction site starts its "built" animation
+ * this far in, so only the roof and the scaffold falling away remain.
+ */
+export const SITE_FINISH_FROM = BUILD_TIME * 0.7;
+/** Buildings that rise on their pad in visible stages while being paid for. */
+export const SITE_STRUCTURES: ReadonlySet<string> = new Set([
+  'grill',
+  'lumberHut',
+  'fishShack',
+  'tradingPost',
+  'quarryCamp',
+  'workshop',
+  'shelter',
+  'smokehouse',
+  'market',
+  'lakeCamp',
+  'tower1',
+  'tower2',
+  'tower3',
+]);
