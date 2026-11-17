@@ -1,9 +1,23 @@
 import { ELDER_WOOD, FOOTPRINT_LIFE, NODE_AMOUNT, CASH_STACK_MAX } from '../core/constants';
+import { feel } from './feel';
 import type { ItemKind, ParticleKind, Vec, World, Sfx } from '../core/types';
 
 /** Queue a sound/haptic cue (played by the host; at most a few per frame). */
 export function sfx(w: World, id: Sfx): void {
   if (w.sfx.length < 12) w.sfx.push(id);
+}
+
+const PARTICLE_BUDGET = 160;
+
+function onPlayerStackLand(w: World): void {
+  const fs = feel(w);
+  fs.stackBumpAt = w.time;
+  const p = w.player;
+  const full = p.carry.length >= p.capacity;
+  if (full && !fs.wasFull) {
+    sfx(w, 'full');
+  }
+  fs.wasFull = full;
 }
 
 export function addFlyer(
@@ -33,6 +47,9 @@ export function burst(
   opts: { color: string | string[]; z?: number; speed?: number; up?: number; size?: number; life?: number },
 ): void {
   const speed = opts.speed ?? 1.2;
+  // Particle budget: busy moments thin out instead of costing frames.
+  if (w.particles.length > PARTICLE_BUDGET) n = Math.min(n, 1);
+  if (w.particles.length > PARTICLE_BUDGET * 1.5) return;
   for (let i = 0; i < n; i++) {
     const a = w.rng() * Math.PI * 2;
     const s = speed * (0.4 + w.rng() * 0.8);
@@ -94,6 +111,8 @@ export function updateEffects(w: World, dt: number): void {
     if (f.t >= f.dur && !f.landed) {
       f.landed = true;
       sfx(w, `land_${f.kind}` as Sfx);
+      // Landing on the player's own stack: the pile squashes under the new item.
+      if (typeof f.to === 'function' && f.to() === w.player.pos) onPlayerStackLand(w);
     }
     if (f.t >= f.dur && f.onLand) {
       f.onLand();

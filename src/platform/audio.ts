@@ -21,6 +21,9 @@ class AudioEngine {
   private melodyIdx = 4;
   private droneNodes: AudioNode[] = [];
   private suspended = false;
+  /** Consecutive coin landings: each one plays a semitone higher. */
+  private coinStep = 0;
+  private coinAt = -1;
 
   /** Create / resume the context. Must run inside a user gesture on iOS. */
   unlock(): void {
@@ -73,7 +76,7 @@ class AudioEngine {
     if (!ctx || this.suspended || !settings.sound || ctx.state !== 'running') return;
     const now = ctx.currentTime;
     // Rate-limit each cue so bursts (many coins) stay pleasant.
-    const gap = id === 'land_coin' ? 0.045 : id === 'step' ? 0.12 : 0.06;
+    const gap = id === 'land_coin' ? 0.03 : id === 'step' ? 0.12 : 0.06;
     if (now - (this.lastPlayed.get(id) ?? -1) < gap) return;
     this.lastPlayed.set(id, now);
     const v = () => 1 + (Math.random() - 0.5) * 0.08; // ±4% pitch variety
@@ -110,11 +113,22 @@ class AudioEngine {
         this.tone(now, 'sine', 760 * v(), 0.06, 0.1, 980);
         break;
       case 'land_coin': {
-        const f = 1320 * v();
+        // A rising ladder while the stream lasts: the "cha-ching" climbs.
+        this.coinStep = now - this.coinAt < 0.3 ? Math.min(this.coinStep + 1, 14) : 0;
+        this.coinAt = now;
+        const f = 990 * Math.pow(2, this.coinStep / 12) * v();
         this.tone(now, 'sine', f, 0.12, 0.07);
         this.tone(now + 0.04, 'sine', f * 1.335, 0.16, 0.06);
         break;
       }
+      case 'stage':
+        this.noiseHit(now, 0.12, 'lowpass', 900, 0.14);
+        this.tone(now, 'triangle', 392, 0.12, 0.16, 523);
+        break;
+      case 'full':
+        this.tone(now, 'sine', 220, 0.12, 0.18, 150);
+        this.tone(now + 0.07, 'sine', 196, 0.14, 0.14, 130);
+        break;
       case 'cooked':
         this.noiseHit(now, 0.18, 'highpass', 3000, 0.05);
         this.tone(now + 0.05, 'sine', 990, 0.18, 0.06);

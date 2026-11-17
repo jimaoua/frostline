@@ -23,6 +23,8 @@ export interface HumanOpts {
   bump?: number;
   shiver?: boolean;
   wind?: number;
+  /** Squash of the carried stacks (1 = rest), right after something lands. */
+  stackSquash?: number;
 }
 
 /** Light always comes from screen upper-left, even on a mirrored sprite. */
@@ -104,8 +106,8 @@ export function drawHuman(ctx: Ctx, sx: number, sy: number, m: Mover, s: HumanSt
   const frontBase = -16 - bob;
 
   // Behind the body: cash backpack (facing camera) or armful (facing away).
-  if (!away && cash.length) drawStack(ctx, cash, backX, -20 - bob, -sway, CASH_STEP);
-  if (away && holding) drawStack(ctx, o.held, frontX, frontBase, -sway);
+  if (!away && cash.length) drawStack(ctx, cash, backX, -20 - bob, -sway, CASH_STEP, o.stackSquash);
+  if (away && holding) drawStack(ctx, o.held, frontX, frontBase, -sway, ITEM_STEP, o.stackSquash);
 
   // Legs with chunky boots.
   for (const leg of [-1, 1]) {
@@ -209,7 +211,7 @@ export function drawHuman(ctx: Ctx, sx: number, sy: number, m: Mover, s: HumanSt
   }
   drawHat(ctx, s, hx, hy, side, away);
 
-  if (away && cash.length) drawStack(ctx, cash, backX, -20 - bob, -sway, CASH_STEP);
+  if (away && cash.length) drawStack(ctx, cash, backX, -20 - bob, -sway, CASH_STEP, o.stackSquash);
 
   // Arms: carry pose when holding, tool swing otherwise.
   if (holding) {
@@ -221,7 +223,7 @@ export function drawHuman(ctx: Ctx, sx: number, sy: number, m: Mover, s: HumanSt
       ball(ctx, 0, 10.5, 3.1, 3.1, s.coatLight, s.coatDark, '#1a2433');
       ctx.restore();
     }
-    if (!away) drawStack(ctx, o.held, frontX, frontBase, sway);
+    if (!away) drawStack(ctx, o.held, frontX, frontBase, sway, ITEM_STEP, o.stackSquash);
   } else {
     const acting = o.swing > 0.01;
     let ang = armSwing;

@@ -2,6 +2,7 @@ import { NODE_AMOUNT, SELL_PRICE } from '../core/constants';
 import { dist } from '../core/math';
 import type { Vec, World } from '../core/types';
 import { ICE_HOLES, inLake, LAKE, QUADRANTS, SPOTS } from '../world/layout';
+import { streak, streakGap, tally } from './feel';
 import { addFlyer, burst, cashTopZ, popup, ring, sfx, stackTopZ } from './effects';
 import { smokeTime } from './levels';
 
@@ -143,13 +144,17 @@ export function lakeInteractions(w: World): boolean {
       return true;
     }
     if (w.marketCash > 0) {
-      const chunk = Math.max(1, Math.ceil(w.marketCash / 10));
+      const st = streak(w, 'marketMat', () => Math.ceil(w.marketCash / 12));
+      const chunk = Math.min(w.marketCash, st.chunk);
       w.marketCash -= chunk;
-      addFlyer(w, 'coin', S.marketMat.pos, 10, playerTarget(w), cashTopZ(w.coins), 0.26, 22, () => {
+      S.marketMat.bumpAt = w.time;
+      addFlyer(w, 'coin', S.marketMat.pos, 10, playerTarget(w), cashTopZ(w.coins), 0.2, 22, () => {
         w.coins += chunk;
         w.stats.coinsEarned += chunk;
+        w.player.bumpAt = w.time;
+        tally(w, w.player.pos, chunk);
       });
-      p.transferT = 0.05;
+      p.transferT = streakGap(st.n, 0.06, 0.015);
       return true;
     }
   }

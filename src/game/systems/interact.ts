@@ -6,8 +6,22 @@ import { SPOTS } from '../world/layout';
 import { completePad } from './build';
 import { addFlyer, burst, cashTopZ, popup, ring, sfx, stackTopZ } from './effects';
 import { iceSplash, lakeInteractions } from './lake';
+import { clearPadFeel, feel, padFeel, streak, streakGap, tally } from './feel';
 
 const playerTarget = (w: World) => () => w.player.pos;
+/** Cash pad pile height cap (in bundles), matching the floor drawing. */
+const CASH_PILE_MAX = 12;
+
+/**
+ * One bill flies from a pile into the cash stack on the player's back; the
+ * wallet only grows when it lands. A single running "+$" total follows you.
+ */
+export function collectCoin(w: World, from: Vec, fromZ: number, amount: number): void {
+  addFlyer(w, 'coin', from, fromZ, playerTarget(w), cashTopZ(w.coins), 0.2, 22, () => {
+    earn(w, amount);
+    tally(w, w.player.pos, amount);
+  });
+}
 const GRILL_TRAY = (w: World): Vec => ({ x: w.structures.grill.pos.x + 0.55, y: w.structures.grill.pos.y + 0.35 });
 
 /** Coins enter the wallet (and the cash stack on the player's back). */
@@ -31,14 +45,20 @@ export function updatePlayerInteractions(w: World, dt: number): void {
   const S = w.structures;
   const full = p.carry.length >= p.capacity;
 
+  const fs = feel(w);
   for (const pad of Object.values(w.pads)) {
     if (!pad.active) continue;
     const h = pad.size / 2;
     if (Math.abs(p.pos.x - pad.pos.x) < h && Math.abs(p.pos.y - pad.pos.y) < h) {
+      if (fs.onPad !== pad.id) {
+        fs.onPad = pad.id;
+        fs.padSince = w.time;
+      }
       payPad(w, pad);
       return;
     }
   }
+  fs.onPad = null;
 
   // Phase 1: feed the campfire.
   if (w.flags.fireAcceptsWood && !w.fire.lit && dist(p.pos, S.campfire.pos) < 1.6 && p.carry.includes('wood')) {
@@ -57,15 +77,17 @@ export function updatePlayerInteractions(w: World, dt: number): void {
   }
 
   // Cash pad: bills jump onto your back.
-  if (S.cashPad.built && dist(p.pos, S.cashPad.pos) < 0.75 && w.kitchen.cash > 0) {
+  if (S.cashPad.built && dist(p.pos, S.cashPad.pos) < 0.95 && w.kitchen.cash > 0) {
     if (p.transferT <= 0) {
-      const chunk = Math.min(w.kitchen.cash, Math.max(5, Math.ceil(w.kitchen.cash / 8)));
+      // Bills leave the top of the pile one by one, then faster and faster.
+      const st = streak(w, 'cashPad', () => Math.ceil(w.kitchen.cash / 16));
+      const chunk = Math.min(w.kitchen.cash, st.chunk);
+      const pileZ = 6 + Math.min(CASH_PILE_MAX, Math.ceil(w.kitchen.cash / 5)) * 2.2;
       w.kitchen.cash -= chunk;
       w.stats.cashCollected += chunk;
       S.cashPad.bumpAt = w.time;
-      addFlyer(w, 'coin', S.cashPad.pos, 8, playerTarget(w), cashTopZ(w.coins), 0.26, 22, () => earn(w, chunk));
-      popup(w, p.pos, 60, `+$${chunk}`, '#9cf5a8');
-      p.transferT = 0.06;
+      collectCoin(w, S.cashPad.pos, pileZ, chunk);
+      p.transferT = streakGap(st.n, 0.06, 0.015);
     }
     return;
   }
@@ -133,10 +155,12 @@ export function updatePlayerInteractions(w: World, dt: number): void {
       });
       p.transferT = 0.07;
     } else if (w.coinPile > 0) {
-      const chunk = Math.max(1, Math.ceil(w.coinPile / 10));
+      const st = streak(w, 'tradeMat', () => Math.ceil(w.coinPile / 12));
+      const chunk = Math.min(w.coinPile, st.chunk);
       w.coinPile -= chunk;
-      addFlyer(w, 'coin', S.tradeMat.pos, 10, playerTarget(w), cashTopZ(w.coins), 0.26, 22, () => earn(w, chunk));
-      p.transferT = 0.05;
+      S.tradeMat.bumpAt = w.time;
+      collectCoin(w, S.tradeMat.pos, 10, chunk);
+      p.transferT = streakGap(st.n, 0.06, 0.015);
     }
     return;
   }
@@ -195,24 +219,63 @@ function payPad(w: World, pad: Pad): void {
   const p = w.player;
   if (p.transferT > 0) return;
   const remaining = pad.cost.amount - pad.paid;
+  if (remaining <= 0) return; // the last items are still in the air
+  // A short beat after stepping on, so walking across a pad never spends by accident.
+  if (w.time - feel(w).padSince < 0.2) return;
+  padFeel(pad); // start tracking what has landed before `paid` moves on
   if (pad.cost.kind === 'coin') {
     if (w.coins <= 0) return;
-    const chunk = Math.min(remaining, w.coins, Math.max(1, Math.ceil(pad.cost.amount / 25)));
+    const st = streak(w, `pad:${pad.id}`, () => Math.ceil(pad.cost.amount / 25));
+    const chunk = Math.min(remaining, w.coins, st.chunk);
+    const fromZ = cashTopZ(w.coins);
     w.coins -= chunk;
     pad.paid += chunk;
-    addFlyer(w, 'coin', p.pos, cashTopZ(w.coins + chunk), pad.pos, 2, 0.28, 26, () => {
-      burst(w, 'spark', pad.pos, 2, { color: '#9cf5a8', z: 4, speed: 0.6, up: 50, size: 1.6, life: 0.4 });
-    });
-    p.transferT = 0.045;
+    addFlyer(w, 'coin', p.pos, fromZ, pad.pos, 2, 0.24, 30, () => landOnPad(w, pad, chunk));
+    p.transferT = streakGap(st.n, 0.06, 0.015, 0.8);
   } else {
     const idx = p.carry.lastIndexOf(pad.cost.kind as Carryable);
     if (idx < 0) return;
+    const st = streak(w, `pad:${pad.id}`, () => 1);
     p.carry.splice(idx, 1);
     pad.paid++;
-    addFlyer(w, pad.cost.kind, p.pos, stackTopZ(p.carry.length), pad.pos, 2, 0.28, 22);
-    p.transferT = 0.07;
+    addFlyer(w, pad.cost.kind, p.pos, stackTopZ(p.carry.length), pad.pos, 2, 0.26, pad.cost.kind === 'stone' || pad.cost.kind === 'ore' ? 16 : 24, () =>
+      landOnPad(w, pad, 1),
+    );
+    p.transferT = streakGap(st.n, 0.09, 0.035);
   }
-  if (pad.paid >= pad.cost.amount) completePad(w, pad);
+}
+
+/**
+ * Something paid has reached the pad: the fill rises by exactly that much,
+ * the pad squashes, and quarter marks get their own little beat. The pad
+ * completes when the last item lands, not when it leaves your hands.
+ */
+function landOnPad(w: World, pad: Pad, amount: number): void {
+  const pf = padFeel(pad);
+  const before = pf.shown / pad.cost.amount;
+  pf.shown = Math.min(pad.paid, pf.shown + amount);
+  pf.bumpAt = w.time;
+  const after = pf.shown / pad.cost.amount;
+  burst(w, 'spark', pad.pos, 2, { color: pad.cost.kind === 'coin' ? '#9cf5a8' : '#ffe08a', z: 4, speed: 0.7, up: 55, size: 1.6, life: 0.35 });
+  if (after < 1 && Math.floor(after * 4) > Math.floor(before * 4)) {
+    ring(w, pad.pos, pad.size * 0.75, '#ffe58a', 0.35);
+    burst(w, 'puff', pad.pos, 4, { color: '#ffffff', z: 4, speed: 0.9, up: 18, size: 6, life: 0.5 });
+    sfx(w, 'stage');
+  }
+  if (pf.shown >= pad.cost.amount && pad.paid >= pad.cost.amount && pad.active && !pad.completed) {
+    clearPadFeel(pad);
+    completePad(w, pad);
+  }
+}
+
+/** A save made while the last items were in flight: finish the pad on load. */
+export function settlePaidPads(w: World): void {
+  for (const pad of Object.values(w.pads)) {
+    if (pad.active && !pad.completed && pad.paid >= pad.cost.amount) {
+      clearPadFeel(pad);
+      completePad(w, pad);
+    }
+  }
 }
 
 function canHarvest(w: World, n: ResourceNode): boolean {

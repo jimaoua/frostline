@@ -7,6 +7,7 @@ import { nightAmount, warmRadius } from '../systems/settlement';
 import { windVec } from '../systems/effects';
 import { QUADRANTS, SPOTS } from '../world/layout';
 import { drawHuman, drawWolf } from './characters';
+import { stackSquash } from '../systems/feel';
 import { drawExpandZone, drawFireRing, drawPad, drawPadBadge, drawWarmZone } from './floor';
 import { drawArrows, drawFireGlow, drawFlyers, drawFootprints, drawParticles, drawPopups, Snowfall } from './fx';
 import { drawBaseEdges, drawGround, type View } from './ground';
@@ -366,6 +367,7 @@ export class Renderer {
             bump: bump >= 0 && bump < 1 ? bump : 0,
             shiver: p.warmth < 40,
             wind: windX,
+            stackSquash: stackSquash(w),
           }),
       });
     }

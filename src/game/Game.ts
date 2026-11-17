@@ -13,7 +13,7 @@ import { Renderer } from './render/renderer';
 import { updateDefense } from './systems/defense';
 import { burst, popup, updateEffects } from './systems/effects';
 import { updateEvents, updateWeather } from './systems/events';
-import { updatePlayerInteractions } from './systems/interact';
+import { settlePaidPads, updatePlayerInteractions } from './systems/interact';
 import { updatePlayer } from './systems/player';
 import { updateKitchen, updateMorale, updateSurvivors } from './systems/settlement';
 import { updateWildlife } from './systems/wildlife';
@@ -68,7 +68,15 @@ const HAPTIC: Partial<Record<Sfx, HapticKind>> = {
   hurt: 'warning',
   drop: 'heavy',
   howl: 'medium',
+  stage: 'medium',
+  full: 'light',
 };
+
+/**
+ * Money moves in fast streams of bills; a tick on every bill turns into a
+ * buzz, so only every third one is felt (sound and motion carry the rest).
+ */
+const HAPTIC_EVERY: Partial<Record<Sfx, number>> = { land_coin: 3 };
 
 /**
  * Framework-agnostic game host. React only mounts it and subscribes to the
@@ -88,13 +96,17 @@ export class Game {
   private saveTimer = AUTOSAVE_EVERY;
   private prevCoins = 0;
   private hiddenAt = 0;
+  private hapticCount = new Map<Sfx, number>();
   private listeners = new Set<() => void>();
   private resizeObserver: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement, container: HTMLElement) {
     const loaded = loadWorld();
     this.world = loaded?.world ?? this.freshWorld();
-    if (loaded) this.offerAwayEarnings(loaded.awaySeconds);
+    if (loaded) {
+      settlePaidPads(this.world);
+      this.offerAwayEarnings(loaded.awaySeconds);
+    }
     this.prevCoins = this.world.coins;
     this.renderer = new Renderer(canvas);
     this.input = new Input(container);
@@ -339,7 +351,14 @@ export class Game {
     for (const id of q) {
       audio.play(id);
       const h = HAPTIC[id];
-      if (h) haptic(h);
+      if (!h) continue;
+      const every = HAPTIC_EVERY[id];
+      if (every) {
+        const n = (this.hapticCount.get(id) ?? 0) + 1;
+        this.hapticCount.set(id, n);
+        if (n % every !== 1) continue;
+      }
+      haptic(h);
     }
     q.length = 0;
   }

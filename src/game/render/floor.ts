@@ -2,6 +2,7 @@ import { FIRE_WOOD_REQUIRED } from '../core/constants';
 import { clamp, easeOutBack } from '../core/math';
 import type { Pad, PadIcon, World } from '../core/types';
 import type { Rect } from '../world/layout';
+import { padBump, padShown } from '../systems/feel';
 import { drawItem } from './items';
 import { onGround, roundRectPath } from './shapes';
 
@@ -183,7 +184,8 @@ export function drawPad(ctx: Ctx, w: World, pad: Pad, sx: number, sy: number): v
   const p = w.player.pos;
   const on = !locked && Math.abs(p.x - pad.pos.x) < pad.size / 2 && Math.abs(p.y - pad.pos.y) < pad.size / 2;
   onGround(ctx, sx, sy, () => {
-    ctx.scale(s / 32, s / 32);
+    const bs = padBump(pad, w.time);
+    ctx.scale((s * bs) / 32, (s * (2 - bs)) / 32);
     const half = pad.size * 16 * (on ? 1.06 : 1);
     if (state === 'all' || on) {
       const pulse = 0.5 + Math.sin(w.time * 6) * 0.5;
@@ -195,7 +197,7 @@ export function drawPad(ctx: Ctx, w: World, pad: Pad, sx: number, sy: number): v
     roundRectPath(ctx, -half, -half, half * 2, half * 2, 9);
     ctx.fillStyle = locked ? 'rgba(70,80,96,0.45)' : 'rgba(26,34,48,0.78)';
     ctx.fill();
-    const ratio = pad.paid / pad.cost.amount;
+    const ratio = padShown(pad) / pad.cost.amount;
     if (ratio > 0 && !locked) {
       ctx.save();
       ctx.clip();
@@ -219,7 +221,8 @@ export function drawPad(ctx: Ctx, w: World, pad: Pad, sx: number, sy: number): v
 
 /** Text for a pad requirement: "150" for cash, "6/10" for materials. */
 export function padQuantity(pad: Pad): string {
-  return pad.cost.kind === 'coin' ? `${pad.cost.amount - pad.paid}` : `${pad.paid}/${pad.cost.amount}`;
+  const shown = padShown(pad);
+  return pad.cost.kind === 'coin' ? `${pad.cost.amount - shown}` : `${shown}/${pad.cost.amount}`;
 }
 
 /**
@@ -231,7 +234,7 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
   const state = padAffordance(w, pad);
   const locked = state === 'locked';
   const appear = Math.max(0.01, easeOutBack(clamp((w.time - pad.activatedAt) / 0.5, 0, 1)));
-  const pulse = state === 'all' ? 1 + Math.sin(w.time * 7) * 0.07 : 1;
+  const pulse = (state === 'all' ? 1 + Math.sin(w.time * 7) * 0.07 : 1) * padBump(pad, w.time);
   const text = padQuantity(pad);
   ctx.save();
   ctx.translate(sx, sy - 6);
@@ -262,7 +265,7 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
   ctx.arc(ix, 0, 19, 0, Math.PI * 2);
   ctx.fillStyle = state === 'all' ? '#ffe9a0' : '#ffffff';
   ctx.fill();
-  const ratio = pad.paid / pad.cost.amount;
+  const ratio = padShown(pad) / pad.cost.amount;
   if (ratio > 0 && !locked) {
     ctx.beginPath();
     ctx.arc(ix, 0, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio);

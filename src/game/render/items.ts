@@ -133,7 +133,8 @@ export function drawItem(ctx: Ctx, kind: ItemKind, x: number, y: number, s = 1):
 }
 
 /** An armful (or backpack tower) of items; sways with the walk. */
-export function drawStack(ctx: Ctx, items: readonly ItemKind[], x: number, baseY: number, sway = 0, step = ITEM_STEP, squash = 1): void {
+export function drawStack(ctx: Ctx, items: readonly ItemKind[], x: number, baseY: number, sway = 0, step = ITEM_STEP, squash: number | undefined = 1): void {
+  squash ??= 1;
   for (let i = 0; i < items.length; i++) {
     const k = i / Math.max(1, items.length);
     drawItem(ctx, items[i], x + sway * k * k * 6, baseY - i * step * squash);

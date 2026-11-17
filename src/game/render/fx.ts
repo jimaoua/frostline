@@ -1,6 +1,6 @@
 import { FOOTPRINT_LIFE } from '../core/constants';
 import { toScreen } from '../core/iso';
-import { easeInOut, easeOutBack } from '../core/math';
+import { easeOutBack } from '../core/math';
 import type { Vec, World } from '../core/types';
 import { drawItem } from './items';
 import { ellipse, onGround } from './shapes';
@@ -46,7 +46,8 @@ export function drawFlyers(ctx: Ctx, w: World): void {
   for (const f of w.flyers) {
     const to = typeof f.to === 'function' ? f.to() : f.to;
     const t = Math.min(1, f.t / f.dur);
-    const e = easeInOut(t);
+    // Fast launch, soft arrival: reads as a toss rather than a slide.
+    const e = 1 - (1 - t) * (1 - t);
     const x = f.from.x + (to.x - f.from.x) * e;
     const y = f.from.y + (to.y - f.from.y) * e;
     const z = f.fromZ + (f.toZ - f.fromZ) * e + Math.sin(Math.PI * e) * f.arc;

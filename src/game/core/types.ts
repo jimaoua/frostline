@@ -299,7 +299,11 @@ export type Sfx =
   | 'hurt'
   | 'howl'
   | 'drop'
-  | 'day';
+  | 'day'
+  /** A construction pad reached 25 / 50 / 75 %. */
+  | 'stage'
+  /** The stack on your back just hit its limit. */
+  | 'full';
 
 export type ParticleKind = 'puff' | 'chip' | 'spark' | 'ember' | 'ring' | 'confetti' | 'breath' | 'wisp' | 'smoke' | 'steam';
 

@@ -2,6 +2,7 @@ import { screenDirToWorldDir } from '../core/iso';
 import { clamp } from '../core/math';
 import type { Caravan, GateDoor, Kitchen, Pad, Trap, Tower, Vec, World } from '../core/types';
 import type { GateDef } from '../world/layout';
+import { padShown } from '../systems/feel';
 import { drawItem } from './items';
 import { C } from './palette';
 import {
@@ -777,7 +778,7 @@ export function drawGhost(ctx: Ctx, pad: Pad, sx: number, sy: number, time: numb
   if (!pad.ghost) return;
   const g = pad.ghost;
   const pulse = 0.5 + Math.sin(time * 3) * 0.5;
-  const ratio = pad.paid / pad.cost.amount;
+  const ratio = padShown(pad) / pad.cost.amount;
   ctx.save();
   ctx.translate(sx, sy);
   ctx.globalAlpha = 0.28 + pulse * 0.12 + ratio * 0.25;
