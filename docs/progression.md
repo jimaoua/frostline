@@ -146,3 +146,42 @@ upgrades take materials too, but have no construction stages yet.
   empty-handed and you take things back, starting with what open buildings
   need. A visit only goes one way, and walking across never triggers it.
   The stash is saved; old saves start with an empty one.
+
+## Playtest round 2
+* **Only the hero sells.** No worker carries goods to the trade mat or the
+  market. The Trading Post no longer brings a hauler; new survivors from the
+  caravan pad become lumberjacks or miners. Smoked fish goes to the market
+  by hand. Old saves lose their haulers and market porter. The woodpile and
+  stonepile now keep everything the workers bring in.
+* **The stash moved and levels up.** It sits in the east yard by the south
+  wall, next to the stonepile, and opens with the yard. Its upgrade pad is
+  just above it.
+
+  | Level | Holds | Price |
+  |---|---|---|
+  | 1 | 30 items | – |
+  | 2 | 60 | 20 logs + $120 |
+  | 3 | 100 | 20 stone + 4 gold + $300 |
+  | 4 | 160 | 30 stone + 3 diamonds + $600 |
+
+  When it is full, the stash says so and the rest stays in your arms.
+* **Upper levels need the cave.** Station Lv2 prices are unchanged. Lv3 asks
+  3 gold and Lv4 asks 2 diamonds, for 60% of the old money price. Their pads
+  show a small lock until the cave is lit. A Lv3/Lv4 pad that an old save had
+  already started keeps its old money price.
+* **Chapter 7** now ends with "Make room in the stash" (stash Lv2) in place
+  of "Hire a market porter". Mission count is unchanged there.
+* **Chapter 8, The Glittering Cave:** a mountain at the north edge of the
+  map, straight out of the north gate. Six missions:
+  1. Follow the glint north of the camp.
+  2. Build the Miners' Lodge (30 logs + 20 stone + 6 ore + $400, four
+     construction stages). It lights the cave.
+  3. Mine 6 gold (5 veins × 3, regrow 50 s).
+  4. Find 2 diamonds (3 crystals × 1, regrow 80 s).
+  5. Gild the grill (Lv 3).
+  6. Turn the stash into a vault (Lv 3).
+
+  "Endure the frontier" now comes after Chapter 8. Only the hero mines gems.
+  Neither the trade mat nor the caravan buys them.
+* **Campaign:** 45 missions. The bot finishes all of them in about 13 minutes
+  of game time: Chapters 1–7 in about 10.5, Chapter 8 in about 2.5.

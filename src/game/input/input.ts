@@ -78,6 +78,9 @@ export class Input {
 
   private onDown = (e: PointerEvent) => {
     if (this.pointerId !== null) return;
+    // Presses on HUD buttons and panels are theirs: only the bare canvas
+    // drives the joystick and counts as a tap on the world.
+    if (!(e.target instanceof HTMLCanvasElement)) return;
     this.pointerId = e.pointerId;
     const p = this.local(e);
     Object.assign(this.stick, { active: true, ox: p.x, oy: p.y, x: p.x, y: p.y });

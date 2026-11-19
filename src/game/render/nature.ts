@@ -3,6 +3,7 @@ import type { ResourceNode } from '../core/types';
 import { C } from './palette';
 import { ball, ellipse, poly, softShadow } from './shapes';
 import { drawSprite, type SpriteCache } from './sprites';
+import { drawItem } from './items';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -185,8 +186,8 @@ export function drawNode(ctx: Ctx, cache: SpriteCache, n: ResourceNode, sx: numb
       drawSprite(ctx, cache.get(n.elder ? 'stumpE' : 'stump', 40, 30, 20, 20, (g) => paintStump(g, n.elder)), sx, sy);
     }
   } else if (n.amount > 0) {
-    const ore = n.kind === 'ore';
-    const s = cache.get(`${n.kind}${n.variant}`, 64, 48, 32, 38, (g) => paintRock(g, n.variant, ore));
+    const ore = n.kind === 'ore' || n.kind === 'gold' || n.kind === 'diamond';
+    const s = cache.get(`${n.kind}${n.variant}`, 64, 48, 32, 38, (g) => paintRock(g, n.variant % 5, ore));
     drawSprite(ctx, s, sx + shakeX, sy, pop);
     if (ore) {
       const tw = Math.max(0, Math.sin(time * 2.4 + n.id));
@@ -194,7 +195,30 @@ export function drawNode(ctx: Ctx, cache: SpriteCache, n: ResourceNode, sx: numb
       ellipse(ctx, sx - 5, sy - 12, 2.5 + tw * 2, 2.5 + tw * 2, `rgba(255,190,90,${0.3 + tw * 0.4})`);
       ctx.globalCompositeOperation = 'source-over';
     }
+    if (n.kind === 'gold' || n.kind === 'diamond') drawGemVein(ctx, n, sx + shakeX, sy, time);
   } else {
     drawSprite(ctx, cache.get('rubble', 36, 20, 18, 13, paintRubble), sx, sy);
   }
+}
+
+/** Gold nuggets or diamond crystals poking out of a cave rock, with a twinkle. */
+function drawGemVein(ctx: Ctx, n: ResourceNode, sx: number, sy: number, time: number): void {
+  const gold = n.kind === 'gold';
+  const spots: [number, number, number][] = gold
+    ? [[-8, -10, 1.1], [5, -15, 0.9], [9, -6, 0.8], [-2, -19, 0.7]]
+    : [[-6, -14, 1.2], [6, -10, 1], [1, -21, 0.8]];
+  const shown = Math.max(1, Math.ceil((spots.length * n.amount) / n.max));
+  for (let i = 0; i < shown; i++) {
+    const [dx, dy, k] = spots[i];
+    drawItem(ctx, gold ? 'gold' : 'diamond', sx + dx, sy + dy, k);
+  }
+  const tw = Math.max(0, Math.sin(time * 3.1 + n.id * 1.7));
+  ctx.globalCompositeOperation = 'lighter';
+  ellipse(ctx, sx + spots[0][0], sy + spots[0][1] - 2, 3 + tw * 3, 3 + tw * 3, gold ? `rgba(255,214,90,${0.25 + tw * 0.45})` : `rgba(160,240,255,${0.3 + tw * 0.5})`);
+  if (tw > 0.85) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillRect(sx + spots[0][0] - 0.6, sy + spots[0][1] - 9, 1.2, 9);
+    ctx.fillRect(sx + spots[0][0] - 4.5, sy + spots[0][1] - 5.1, 9, 1.2);
+  }
+  ctx.globalCompositeOperation = 'source-over';
 }

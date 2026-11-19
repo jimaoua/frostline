@@ -1,5 +1,6 @@
 import type { Carryable, ItemKind, Pad, World } from './core/types';
 import { BUILDING_INFO } from './world/buildingInfo';
+import { stashCapacity } from './systems/levels';
 import { isMulti } from './systems/padcost';
 import { currentObjective } from './progression/phases';
 import { EVENT_INFO } from './systems/events';
@@ -18,7 +19,13 @@ export interface HudSnapshot {
   /** Money, and what the player is carrying right now (by kind). */
   resources?: { coins: number; carry: { kind: Carryable; n: number }[] };
   /** What sits in the stash, and what the workers have stockpiled. */
-  storage?: { stash: { kind: Carryable; n: number }[]; workers: { id: string; label: string; kind: ItemKind; n: number }[] };
+  storage?: {
+    stash: { kind: Carryable; n: number }[];
+    stashCap: number;
+    stashLevel: number;
+    stashOpen: boolean;
+    workers: { id: string; label: string; kind: ItemKind; n: number }[];
+  };
   info?: { id: string; title: string; text: string };
   morale?: { value: number; residents: number };
   defense?: { health: number; maxHealth: number; wave: number; nextWaveIn: number | null; wolves: number };
@@ -86,7 +93,7 @@ function isMultiStep(w: World, stepId: string): boolean {
 }
 
 const INFO_SECONDS = 5;
-const KINDS: Carryable[] = ['wood', 'stone', 'ore', 'fish', 'meal', 'salmon', 'smoked'];
+const KINDS: Carryable[] = ['wood', 'stone', 'ore', 'gold', 'diamond', 'fish', 'meal', 'salmon', 'smoked'];
 
 /** Counts in the player's arms: logs and stone always, the rest only when carried. */
 function carried(w: World): { kind: Carryable; n: number }[] {
@@ -113,5 +120,5 @@ function storage(w: World): NonNullable<HudSnapshot['storage']> {
   add(S.tradeMat.built, 'trade', 'Trade mat', 'coin', w.coinPile);
   add(S.smokehouse.built, 'smoked', 'Smokehouse', 'smoked', w.smoke.ready);
   add(S.marketMat.built, 'market', 'Market mat', 'coin', w.marketCash);
-  return { stash, workers };
+  return { stash, stashCap: stashCapacity(w), stashLevel: w.levels.stash ?? 1, stashOpen: S.stash.built, workers };
 }

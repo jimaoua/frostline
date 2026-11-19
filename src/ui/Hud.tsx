@@ -199,7 +199,10 @@ function StorageButtons({ s }: { s: NonNullable<HudSnapshot['storage']> }) {
     <div className="storage" onPointerDown={stopPointer}>
       <div className="storage__btns">
         <button type="button" className={`storebtn ${open === 'stash' ? 'storebtn--on' : ''}`} onClick={() => toggle('stash')}>
-          <i className="ico ico--crate" /> Stash <b>{stashTotal}</b>
+          <i className="ico ico--crate" /> Stash{' '}
+          <b>
+            {stashTotal}/{s.stashCap}
+          </b>
         </button>
         <button type="button" className={`storebtn ${open === 'workers' ? 'storebtn--on' : ''}`} onClick={() => toggle('workers')}>
           <i className="ico ico--worker" /> Workers
@@ -207,8 +210,11 @@ function StorageButtons({ s }: { s: NonNullable<HudSnapshot['storage']> }) {
       </div>
       {open === 'stash' && (
         <div className="storepanel">
-          <h4>Your stash</h4>
-          {s.stash.length === 0 && <p>Empty. Step on the stash with full hands to drop things off.</p>}
+          <h4>
+            Your stash · Lv {s.stashLevel} · {stashTotal}/{s.stashCap}
+          </h4>
+          {!s.stashOpen && <p>The stash opens with the east yard, next to the stonepile.</p>}
+          {s.stashOpen && s.stash.length === 0 && <p>Empty. Stop on the stash with full hands to drop things off.</p>}
           {s.stash.map((x) => (
             <div className="storerow" key={x.kind}>
               <i className={`ico ico--${x.kind}`} />
@@ -242,6 +248,8 @@ const ITEM_NAME: Record<string, string> = {
   meal: 'Meals',
   salmon: 'Salmon',
   smoked: 'Smoked salmon',
+  gold: 'Gold',
+  diamond: 'Diamonds',
   coin: 'Cash',
 };
 

@@ -9,6 +9,7 @@ import { QUADRANTS, SPOTS } from '../world/layout';
 import { drawHuman, drawWolf } from './characters';
 import { padBumpAt, padShownRatio, padStageAt, stackSquash } from '../systems/feel';
 import { SITE_STRUCTURES } from '../core/constants';
+import { drawCave } from './cave';
 import { drawStashFloor, drawStationZone, drawExpandZone, drawFireRing, drawPad, drawPadBadge, drawWarmZone } from './floor';
 import { drawArrows, drawFireGlow, drawFlyers, drawFootprints, drawParticles, drawPopups, Snowfall } from './fx';
 import { drawBaseEdges, drawGround, type View } from './ground';
@@ -41,6 +42,7 @@ import {
   sledPos,
   withSite,
   drawStashPiles,
+  drawMineLodge,
   type SiteState,
 } from './structures';
 
@@ -171,6 +173,8 @@ export class Renderer {
         if (visible(s.x, s.y)) drawIceHole(ctx, n, s.x, s.y, time);
       }
     }
+    // Chapter 8: the cave floor and the mountain behind it.
+    if (w.flags.caveFound) drawCave(ctx, time, w.flags.cave);
     drawBaseEdges(ctx, w);
     const S = w.structures;
     if (S.fishPond.built) {
@@ -324,6 +328,10 @@ export class Renderer {
           break;
         case 'lakeCamp':
           draw = () => drawLakeCamp(ctx, s.x, s.y, time, b, night);
+          dd = 0.3;
+          break;
+        case 'mineLodge':
+          draw = () => drawMineLodge(ctx, s.x, s.y, time, b, night);
           dd = 0.3;
           break;
         case 'tower1':
@@ -487,7 +495,9 @@ export class Renderer {
       // Building pads: the price floats above the plot, over the roof line,
       // so it still marks where to stand but never hides the pad or the
       // construction rising on it.
-      const lift = padHasSite(pad) && !pad.locked ? (pad.ghost?.h ?? 40) + 26 : 0;
+      // Level pads sit beside their station: their rows float a little higher
+      // so they don't sit on top of it (e.g. the stash below its upgrade pad).
+      const lift = padHasSite(pad) && !pad.locked ? (pad.ghost?.h ?? 40) + 26 : pad.effect.type === 'level' && !pad.locked ? 30 : 0;
       const s = toScreen(pad.pos.x, pad.pos.y, lift);
       if (visible(s.x, s.y, 60)) drawPadBadge(ctx, w, pad, s.x, s.y, this.zoom);
     }

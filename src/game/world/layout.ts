@@ -82,8 +82,12 @@ export const SPOTS = {
   tradeMat: { x: 27.6, y: 19.9 },
   quarryCamp: { x: 29.8, y: 22.4 },
   stonepile: { x: 26.0, y: 22.5 },
-  // Drop-off for anything you carry (never money), in the starting yard.
-  stash: { x: 18.9, y: 23.1 },
+  // Drop-off for anything you carry (never money), by the stonepile in the
+  // east yard, with its upgrade pad beside it.
+  stash: { x: 27.6, y: 23.15 },
+  upStash: { x: 27.5, y: 21.6 },
+  // Chapter 8: the glittering cave north of the north gate.
+  mineLodge: { x: 23.4, y: 5.4 },
   tower1: { x: 16.9, y: 23.1 },
   expandNorth: { x: 20.0, y: 16.8 },
   tower2: { x: 30.8, y: 17.2 },
@@ -117,6 +121,22 @@ export const SPOTS = {
 } satisfies Record<string, Vec>;
 
 const ROCK_ZONE: Rect = { x: 34, y: 15, w: 6.5, h: 10 };
+
+/** Chapter 8: the cave floor (world-space ellipse) below the mountain at the map's north edge. */
+export const CAVE = { x: 20, y: 3.6, rx: 3.6, ry: 2.2 };
+export const CAVE_MOUTH = { x: 20, y: 1.9 };
+/** Where the gold and diamond veins sit on the cave floor. */
+export const GEM_VEINS: { kind: 'gold' | 'diamond'; x: number; y: number }[] = [
+  { kind: 'gold', x: 17.6, y: 3.4 },
+  { kind: 'gold', x: 18.9, y: 4.7 },
+  { kind: 'gold', x: 21.3, y: 4.9 },
+  { kind: 'gold', x: 22.5, y: 3.5 },
+  { kind: 'gold', x: 19.3, y: 2.9 },
+  { kind: 'diamond', x: 20.4, y: 3.7 },
+  { kind: 'diamond', x: 17.9, y: 4.6 },
+  { kind: 'diamond', x: 22.2, y: 4.6 },
+];
+export const inCave = (x: number, y: number, m = 0) => ((x - CAVE.x) / (CAVE.rx + m)) ** 2 + ((y - CAVE.y) / (CAVE.ry + m)) ** 2 <= 1;
 
 /** The frozen lake west of the camp (world-space ellipse), revealed in Chapter 2. */
 export const LAKE = { x: 3.9, y: 20, rx: 2.75, ry: 5.4 };

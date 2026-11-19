@@ -7,7 +7,8 @@ import { popup } from '../systems/effects';
 import { clearWestYard } from '../systems/lake';
 import { spawnStranded } from '../systems/settlement';
 import { isMulti, padParts, padRatio } from '../systems/padcost';
-import { SPOTS } from '../world/layout';
+import { CAVE, CAVE_MOUTH, SPOTS } from '../world/layout';
+import { revealCave } from '../systems/cave';
 
 /**
  * Strict, staged progression. Exactly one objective is live at a time, each
@@ -56,6 +57,8 @@ function nearestTree(w: World): Vec | null {
 
 /** Where to get a building material: its stockpile if workers filled it, else the nearest node. */
 function materialSource(w: World, kind: string): Vec | null {
+  if (w.structures.stash.built && (w.stash[kind as keyof World['stash']] ?? 0) > 0) return w.structures.stash.pos;
+  if (kind === 'gold' || kind === 'diamond') return nearestNodeOf(w, kind);
   if (kind === 'wood') return w.stock.wood > 0 && w.structures.woodpile.built ? w.structures.woodpile.pos : nearestTree(w);
   const nodeKind = kind === 'stone' ? 'rock' : kind === 'ore' ? 'ore' : null;
   if (!nodeKind) return null;
@@ -141,11 +144,16 @@ const padStep = (id: PadId, text: string, hint?: string, enter?: (w: World) => v
   done: (w) => w.pads[id].completed,
 });
 
-/** Buy the next level of a station; its pad stays open for later levels. */
-const levelStep = (id: PadId, station: StationId, text: string, hint: string): StepDef => ({
+/** Buy a level of a station (Lv2 by default); its pad stays open for later levels. */
+const levelStep = (id: PadId, station: StationId, text: string, hint: string, level = 2): StepDef => ({
   ...padStep(id, text, hint),
-  progress: (w) => (w.levels[station] >= 2 ? [1, 1] : [w.pads[id].paid, w.pads[id].cost.amount]),
-  done: (w) => w.levels[station] >= 2,
+  id: level > 2 ? `${id}${level}` : id,
+  progress: (w) => {
+    if (w.levels[station] >= level) return [1, 1];
+    const pad = w.pads[id];
+    return isMulti(pad) ? [Math.floor(padRatio(pad) * 100), 100] : [pad.paid, pad.cost.amount];
+  },
+  done: (w) => w.levels[station] >= level,
 });
 
 const countStep = (
@@ -300,7 +308,7 @@ export const PHASES: PhaseDef[] = [
       }
     },
     steps: [
-      padStep('tradingPost', 'Build the Trading Post', 'Logs from the woodpile pay for this. A hauler will sell your surplus.', undefined, (w) =>
+      padStep('tradingPost', 'Build the Trading Post', 'Logs from the woodpile pay for this. Sell your surplus on the mat.', undefined, (w) =>
         carrying(w, 'wood') === 0 && w.stock.wood > 0 ? w.structures.woodpile.pos : null,
       ),
       padStep('quarryCamp', 'Build the Quarry Camp', 'Rocks wait east of the new yard.'),
@@ -399,7 +407,29 @@ export const PHASES: PhaseDef[] = [
       ),
       padStep('lakeCamp', "Build the Ice Fishers' Hut", 'Two ice fishers will keep the racks full.'),
       levelStep('upSmoke', 'smoke', 'Upgrade the Smokehouse', 'Faster racks, more fish to sell.'),
-      padStep('porter', 'Hire a market porter', 'The porter carries smoked fish to the market for you.'),
+      levelStep('upStash', 'stash', 'Make room in the stash', 'Logs and cash buy a bigger stash by the stonepile.'),
+    ],
+  },
+  {
+    id: 8,
+    title: 'The Glittering Cave',
+    enter: (w) => {
+      revealCave(w);
+      popup(w, SPOTS.mineLodge, 80, 'Chapter 3: The Glittering Cave', '#ffe9a0', true);
+    },
+    steps: [
+      {
+        id: 'findCave',
+        text: () => 'Follow the glint north of the camp',
+        hint: 'Out through the north gate, to the foot of the mountain.',
+        target: () => CAVE_MOUTH,
+        done: (w) => dist(w.player.pos, CAVE) < 3.2,
+      },
+      padStep('mineLodge', "Build the Miners' Lodge", 'Lanterns and timber make the cave safe to work.'),
+      countStep('gold', 'Mine 6 gold', 'goldMined', 6, 'Swing your pick at the gold veins in the cave.', undefined, (w) => nearestNodeOf(w, 'gold')),
+      countStep('diamonds', 'Find 2 diamonds', 'diamondsMined', 2, 'The blue crystals hold diamonds.', undefined, (w) => nearestNodeOf(w, 'diamond')),
+      levelStep('upGrill', 'grill', 'Gild the grill (Lv 3)', 'Gold buys the higher levels now.', 3),
+      levelStep('upStash', 'stash', 'Turn the stash into a vault (Lv 3)', 'Stone and gold make the stash bigger.', 3),
       {
         id: 'endless',
         text: (w) => `Endure the frontier · Day ${w.day.day}`,
@@ -409,6 +439,21 @@ export const PHASES: PhaseDef[] = [
     ],
   },
 ];
+
+/** The nearest mineable node of a kind (gold or diamond veins in the cave). */
+function nearestNodeOf(w: World, kind: 'gold' | 'diamond'): Vec | null {
+  let best: Vec | null = null;
+  let bd = Infinity;
+  for (const n of w.nodes) {
+    if (n.kind !== kind || !n.visible || n.amount <= 0) continue;
+    const d = dist(n.pos, w.player.pos);
+    if (d < bd) {
+      bd = d;
+      best = n.pos;
+    }
+  }
+  return best;
+}
 
 function nextStep(w: World): StepDef | null {
   const phase = PHASES[w.phase - 1];

@@ -102,11 +102,10 @@ export function lakeInteractions(w: World): boolean {
   const S = w.structures;
   const full = p.carry.length >= p.capacity;
 
-  // Smokehouse: drop salmon; pick up smoked fish when no porter is running it.
+  // Smokehouse: drop salmon, pick up smoked fish to carry to the market.
   if (S.smokehouse.built && dist(p.pos, SPOTS.smokeDrop) < 1.1) {
     const hasSalmon = p.carry.includes('salmon');
-    const porter = w.workers.some((x) => x.role === 'porter');
-    const wantSmoked = w.smoke.ready > 0 && !full && (!porter || w.smoke.ready > 8);
+    const wantSmoked = w.smoke.ready > 0 && !full;
     if (hasSalmon || wantSmoked) {
       p.lookAt = S.smokehouse.pos;
       if (p.transferT > 0) return true;

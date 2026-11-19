@@ -1143,3 +1143,16 @@ button.install {
   6%, 90% { opacity: 1; transform: translate(-50%, 0); }
   100% { opacity: 0; transform: translate(-50%, 0); }
 }
+
+.ico--gold {
+  background: linear-gradient(135deg, #fff3b0, #f2b928 45%, #b07a0c);
+  border-radius: 40% 55% 35% 50%;
+  height: 13px;
+}
+
+.ico--diamond {
+  background: linear-gradient(160deg, #ffffff, #9ff3ff 40%, #3b9fc4);
+  clip-path: polygon(20% 0, 80% 0, 100% 35%, 50% 100%, 0 35%);
+  border-radius: 0;
+  height: 15px;
+}

@@ -941,3 +941,34 @@ export function drawStashPiles(ctx: Ctx, stash: Partial<Record<ItemKind, number>
     ctx.fillText(`${n}`, sx + p.x, top);
   });
 }
+
+/** Chapter 8: the Miners' Lodge, stone base, timber walls, a lantern and an ore cart. */
+export function drawMineLodge(ctx: Ctx, sx: number, sy: number, time: number, builtAt: number, night: number): void {
+  withBuild(ctx, builtAt, time, 50, 0.8, sx, sy, () => {
+    softShadow(ctx, 5, 5, 54, 24, 0.32);
+    const W = 1.5;
+    const D = 1.2;
+    prism(ctx, 0, 0, W + 0.1, D + 0.1, 7, 0, { left: '#8d97a3', right: '#6d7783', top: '#a9b2bd', stroke: 'rgba(40,48,60,0.5)' });
+    ctx.save();
+    ctx.translate(0, -7);
+    logWalls(ctx, W, D, 24, '#d9a46e', '#a86c3a', '#7a4a28');
+    poly(ctx, [rel(-0.22, D / 2, 0), rel(0.22, D / 2, 0), rel(0.22, D / 2, 17), rel(-0.22, D / 2, 17)], '#3f2412', '#2a160a', 1);
+    windowOn(ctx, [rel(W / 2, -0.3, 9), rel(W / 2, 0.15, 9), rel(W / 2, 0.15, 17), rel(W / 2, -0.3, 17)], night);
+    gableRoof(ctx, 0, 0, W, D, 23, 44, 0.16, { front: '#7d8794', back: '#5a6370', gable: '#a86c3a', snow: '#f7fbff' });
+    ctx.restore();
+    // Lantern on a hook by the door.
+    const l = rel(0.4, D / 2 + 0.05, 24);
+    const f = 0.8 + 0.2 * Math.sin(time * 7);
+    ctx.globalCompositeOperation = 'lighter';
+    ellipse(ctx, l.x, l.y, 10 * f, 10 * f, 'rgba(255,180,80,0.3)');
+    ctx.globalCompositeOperation = 'source-over';
+    ellipse(ctx, l.x, l.y, 2.4, 3, '#ffd27a');
+    // Ore cart with a little gold in it.
+    const c = rel(-W / 2 - 0.45, D / 2 + 0.15);
+    poly(ctx, [{ x: c.x - 9, y: c.y - 9 }, { x: c.x + 9, y: c.y - 9 }, { x: c.x + 7, y: c.y - 2 }, { x: c.x - 7, y: c.y - 2 }], '#6b5444', '#3a2a1e', 0.8);
+    drawItem(ctx, 'gold', c.x - 3, c.y - 10, 0.8);
+    drawItem(ctx, 'ore', c.x + 3, c.y - 10, 0.8);
+    ellipse(ctx, c.x - 5, c.y - 1, 2.2, 2.2, '#2a2a30');
+    ellipse(ctx, c.x + 5, c.y - 1, 2.2, 2.2, '#2a2a30');
+  });
+}

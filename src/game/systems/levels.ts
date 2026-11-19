@@ -1,5 +1,5 @@
 import { COOK_TIME, FISH_INTERVAL, MEAL_PRICE, SMOKE_TIME } from '../core/constants';
-import type { Pad, StationId, Vec, World } from '../core/types';
+import type { Pad, PadPart, StationId, Vec, World } from '../core/types';
 import { burst, celebrate, popup, sfx } from './effects';
 
 /**
@@ -15,12 +15,42 @@ export const STATION_MAX = 4;
 /** Cost multiplier for each further station level. */
 const LEVEL_COST_GROWTH = 2.1;
 
+/** Money price of a station's Lv2 (its pad's starting price). */
+const LEVEL_BASE: Record<StationId, number> = { grill: 40, hatch: 90, fishing: 120, lumber: 150, smoke: 400, stash: 120 };
+
+/** What the stash holds at each level (items of any kind, never money). */
+export const STASH_CAPACITY = [0, 30, 60, 100, 160] as const;
+export const stashCapacity = (w: World) => STASH_CAPACITY[Math.min(STATION_MAX, Math.max(1, w.levels.stash ?? 1))];
+
+const round10 = (n: number) => Math.round(n / 10) * 10;
+
+/**
+ * Price of a station level. Lv2 is money (the stash also wants logs). The
+ * upper levels come from the cave: Lv3 needs gold and Lv4 diamonds, for a
+ * lot less money than the old all-cash price.
+ */
+export function levelCost(station: StationId, level: number): { cost: Pad['cost']; parts: PadPart[] } {
+  const base = LEVEL_BASE[station];
+  if (station === 'stash') {
+    if (level <= 2) return { cost: { kind: 'coin', amount: 120 }, parts: [{ kind: 'wood', amount: 20, paid: 0 }] };
+    if (level === 3) return { cost: { kind: 'coin', amount: 300 }, parts: [{ kind: 'stone', amount: 20, paid: 0 }, { kind: 'gold', amount: 4, paid: 0 }] };
+    return { cost: { kind: 'coin', amount: 600 }, parts: [{ kind: 'stone', amount: 30, paid: 0 }, { kind: 'diamond', amount: 3, paid: 0 }] };
+  }
+  if (level <= 2) return { cost: { kind: 'coin', amount: base }, parts: [] };
+  if (level === 3) return { cost: { kind: 'coin', amount: round10(base * LEVEL_COST_GROWTH * 0.6) }, parts: [{ kind: 'gold', amount: 3, paid: 0 }] };
+  return { cost: { kind: 'coin', amount: round10(base * LEVEL_COST_GROWTH * LEVEL_COST_GROWTH * 0.6) }, parts: [{ kind: 'diamond', amount: 2, paid: 0 }] };
+}
+
+/** Does this pad's price include something only the cave gives? */
+export const needsGems = (pad: Pad) => (pad.parts ?? []).some((p) => p.kind === 'gold' || p.kind === 'diamond');
+
 export const STATION_LABEL: Record<StationId, string> = {
   grill: 'Grill',
   hatch: 'Serving hatch',
   fishing: 'Fishing',
   lumber: 'Lumber camp',
   smoke: 'Smokehouse',
+  stash: 'Stash',
 };
 
 const STATION_PERK: Record<StationId, string> = {
@@ -29,6 +59,7 @@ const STATION_PERK: Record<StationId, string> = {
   fishing: 'Fish bite faster',
   lumber: 'Lumberjacks chop faster',
   smoke: 'Smokes faster',
+  stash: 'Holds more',
 };
 
 // --- Station effects -------------------------------------------------------
@@ -58,18 +89,30 @@ export function completeLevelPad(w: World, pad: Pad, station: StationId): void {
   pad.rearm = true;
   pad.paid = 0;
   pad.level = lv + 1;
-  pad.cost = { ...pad.cost, amount: Math.round((pad.cost.amount * LEVEL_COST_GROWTH) / 10) * 10 };
+  const next = levelCost(station, lv + 1);
+  pad.cost = next.cost;
+  pad.parts = next.parts;
 }
 
 /** Re-open level pads after the player has stepped off them. */
 export function updateLevelPads(w: World): void {
   const p = w.player.pos;
   for (const pad of Object.values(w.pads)) {
+    // Gold/diamond levels wait, locked, until the cave is lit.
+    if (pad.effect.type === 'level' && !pad.completed && needsGems(pad) && !w.flags.cave) {
+      if (pad.active) {
+        pad.active = false;
+        pad.rearm = true;
+      }
+      if (pad.rearm) pad.locked = true;
+      continue;
+    }
     if (!pad.rearm) continue;
     const h = pad.size / 2 + 0.15;
     if (Math.abs(p.x - pad.pos.x) < h && Math.abs(p.y - pad.pos.y) < h) continue;
     pad.rearm = false;
     pad.active = true;
+    pad.locked = false;
     pad.activatedAt = w.time;
   }
 }

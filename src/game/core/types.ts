@@ -6,7 +6,7 @@ export interface Vec {
 }
 
 /** Things that physically ride on a back. Cash is shown separately. */
-export type Carryable = 'wood' | 'stone' | 'ore' | 'fish' | 'meal' | 'salmon' | 'smoked';
+export type Carryable = 'wood' | 'stone' | 'ore' | 'fish' | 'meal' | 'salmon' | 'smoked' | 'gold' | 'diamond';
 export type ItemKind = Carryable | 'coin';
 export type QuadrantId = 'core' | 'east' | 'north' | 'west';
 
@@ -24,6 +24,7 @@ export type StructureId =
   | 'quarryCamp'
   | 'stonepile'
   | 'stash'
+  | 'mineLodge'
   | 'tower1'
   | 'tower2'
   | 'workshop'
@@ -60,10 +61,12 @@ export type PadId =
   | 'upSmoke'
   | 'porter'
   | 'tower3'
-  | UpgradeId;
+  | UpgradeId
+  | 'upStash'
+  | 'mineLodge';
 
 /** Stations that level up through their own upgrade pad. */
-export type StationId = 'grill' | 'hatch' | 'fishing' | 'lumber' | 'smoke';
+export type StationId = 'grill' | 'hatch' | 'fishing' | 'lumber' | 'smoke' | 'stash';
 
 /**
  * Anything that walks. Facing is a SCREEN-space angle so the renderer can
@@ -136,7 +139,7 @@ export interface Survivor extends Mover {
   idleT: number;
 }
 
-export type NodeKind = 'tree' | 'rock' | 'ore' | 'icehole';
+export type NodeKind = 'tree' | 'rock' | 'ore' | 'icehole' | 'gold' | 'diamond';
 
 export interface ResourceNode {
   id: number;
@@ -359,6 +362,8 @@ export interface Stats {
   coinsEarned: number;
   wolvesKilled: number;
   oreSold: number;
+  goldMined: number;
+  diamondsMined: number;
   scoutsFound: number;
   stormsWeathered: number;
   fishCaught: number;
@@ -374,6 +379,10 @@ export interface Stats {
 export interface Flags {
   /** Chapter 2: the frozen lake west of the camp is revealed. */
   lake: boolean;
+  /** Chapter 8: the cave north of the camp has been found (trees cleared, veins placed). */
+  caveFound: boolean;
+  /** Chapter 8: the Miners' Lodge lights the cave; gold and diamonds can be mined. */
+  cave: boolean;
   harvestWood: boolean;
   harvestStone: boolean;
   harvestOre: boolean;

@@ -1,5 +1,5 @@
 import { FIRE_WOOD_REQUIRED, REGROW, SELL_PRICE } from '../core/constants';
-import { playerFishInterval } from './levels';
+import { playerFishInterval, stashCapacity } from './levels';
 import { dist } from '../core/math';
 import type { Carryable, Pad, ResourceNode, Vec, World } from '../core/types';
 import { SPOTS } from '../world/layout';
@@ -191,10 +191,13 @@ export function updatePlayerInteractions(w: World, dt: number): void {
 
   // Visiting caravan pays double for anything you carry.
   const cv = w.caravan;
-  if (cv && cv.state === 'trading' && dist(p.pos, cv.pos) < 1.4 && p.carry.length) {
+  // Gold and diamonds are for upgrades: the caravan never takes them.
+  let sellable = p.carry.length - 1;
+  while (sellable >= 0 && (p.carry[sellable] === 'gold' || p.carry[sellable] === 'diamond')) sellable--;
+  if (cv && cv.state === 'trading' && dist(p.pos, cv.pos) < 1.4 && sellable >= 0) {
     p.lookAt = cv.pos;
     if (p.transferT <= 0) {
-      const item = p.carry.pop() as Carryable;
+      const item = p.carry.splice(sellable, 1)[0];
       if (item === 'ore') w.stats.oreSold++;
       addFlyer(w, item, p.pos, stackTopZ(p.carry.length), cv.pos, 20, 0.26, 20, () => earn(w, SELL_PRICE[item] * 2, cv.pos));
       p.transferT = 0.07;
@@ -340,7 +343,7 @@ function wantsStone(w: World): boolean {
 }
 
 const STASH_RADIUS = 0.75;
-const STASH_ORDER: Carryable[] = ['wood', 'stone', 'ore', 'fish', 'meal', 'salmon', 'smoked'];
+const STASH_ORDER: Carryable[] = ['wood', 'stone', 'ore', 'gold', 'diamond', 'fish', 'meal', 'salmon', 'smoked'];
 
 /**
  * One stash transfer. The visit's direction is fixed when you step on, so
@@ -354,6 +357,7 @@ function stashStep(w: World): boolean {
   if (fs.stashMode === null) {
     fs.stashMode = p.carry.length > 0 ? 'drop' : 'take';
     fs.stashSince = w.time;
+    fs.stashFullShown = false;
   }
   // Only when you stop on it: walking across the stash never empties your arms.
   if (Math.hypot(p.vel.x, p.vel.y) > 0.6) fs.stashSince = w.time;
@@ -361,6 +365,16 @@ function stashStep(w: World): boolean {
   const at = w.structures.stash.pos;
   if (fs.stashMode === 'drop') {
     if (p.carry.length === 0) return false;
+    const stored = Object.values(stash).reduce((a, n) => a + (n ?? 0), 0);
+    if (stored >= stashCapacity(w)) {
+      // Full: say so once per visit, keep the rest in your arms.
+      if (!fs.stashFullShown) {
+        fs.stashFullShown = true;
+        popup(w, at, 70, 'Stash full', '#ffb3a8');
+        sfx(w, 'full');
+      }
+      return false;
+    }
     if (p.transferT > 0) return true;
     const kind = p.carry.pop()!;
     stash[kind] = (stash[kind] ?? 0) + 1;
@@ -397,6 +411,7 @@ function canHarvest(w: World, n: ResourceNode): boolean {
   if (n.kind === 'tree') return w.flags.harvestWood;
   if (n.kind === 'rock') return w.flags.harvestStone;
   if (n.kind === 'icehole') return w.flags.lake;
+  if (n.kind === 'gold' || n.kind === 'diamond') return w.flags.cave;
   return w.flags.harvestOre;
 }
 
@@ -440,12 +455,17 @@ function harvest(w: World): void {
   p.actionT = w.upgrades.sharpAxes ? 0.28 : 0.42;
   p.swing = 1;
   p.tool = node.kind === 'tree' ? 'axe' : 'pick';
-  const item: Carryable = node.kind === 'tree' ? 'wood' : node.kind === 'rock' ? 'stone' : 'ore';
+  const item: Carryable =
+    node.kind === 'tree' ? 'wood' : node.kind === 'rock' ? 'stone' : node.kind === 'gold' ? 'gold' : node.kind === 'diamond' ? 'diamond' : 'ore';
   p.carry.push(item);
   if (item === 'stone') w.stats.stoneGathered++;
+  if (item === 'gold') w.stats.goldMined++;
+  if (item === 'diamond') w.stats.diamondsMined++;
   addFlyer(w, item, node.pos, 30, playerTarget(w), stackTopZ(p.carry.length), 0.32, 24);
   sfx(w, node.kind === 'tree' ? 'chop' : 'mine');
-  popup(w, node.pos, 54, '+1', item === 'ore' ? '#ffcf7a' : '#ffffff');
+  const gem = item === 'gold' || item === 'diamond';
+  if (gem) burst(w, 'spark', node.pos, 8, { color: item === 'gold' ? ['#ffd34d', '#fff3c4'] : ['#9ff3ff', '#ffffff'], z: 20, speed: 1.4, up: 120, size: 2, life: 0.6 });
+  popup(w, node.pos, 54, '+1', item === 'ore' || item === 'gold' ? '#ffcf7a' : item === 'diamond' ? '#9ff3ff' : '#ffffff');
 }
 
 /** Take one unit from a node (shared by player and workers). */

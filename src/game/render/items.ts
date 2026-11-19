@@ -129,6 +129,30 @@ export function drawItem(ctx: Ctx, kind: ItemKind, x: number, y: number, s = 1):
       fillRR(ctx, x - 1.6 * s, y - 2.6 * s, 3.2 * s, 5.2 * s, 0.6 * s, '#f2e6c4');
       break;
     }
+    case 'gold': {
+      // A chunky nugget with a bright highlight.
+      const pts = [
+        { x: x - 5.6 * s, y: y + 2.4 * s },
+        { x: x - 4.4 * s, y: y - 2 * s },
+        { x: x - 0.6 * s, y: y - 3.4 * s },
+        { x: x + 4.6 * s, y: y - 1.6 * s },
+        { x: x + 5.6 * s, y: y + 2.4 * s },
+      ];
+      poly(ctx, pts, vGrad(ctx, y - 3.4 * s, y + 2.4 * s, '#ffe680', '#d4920f'), '#8a5a06', 0.7 * s);
+      poly(ctx, [pts[1], pts[2], { x: x + 0.6 * s, y: y - 0.8 * s }, { x: x - 2.6 * s, y: y + 0.1 * s }], '#fff3b0');
+      ellipse(ctx, x + 2.2 * s, y + 0.6 * s, 0.9 * s, 0.6 * s, '#fffbe6');
+      break;
+    }
+    case 'diamond': {
+      // A cut gem: crown facets on top, pavilion to a point below.
+      const top = y - 3.4 * s;
+      const girdle = y - 0.8 * s;
+      poly(ctx, [{ x: x - 5 * s, y: girdle }, { x: x - 2.6 * s, y: top }, { x: x + 2.6 * s, y: top }, { x: x + 5 * s, y: girdle }], '#c9f7ff', '#3b8fb0', 0.7 * s);
+      poly(ctx, [{ x: x - 5 * s, y: girdle }, { x: x + 5 * s, y: girdle }, { x, y: y + 4 * s }], '#6fd3f0', '#3b8fb0', 0.7 * s);
+      poly(ctx, [{ x: x - 1 * s, y: girdle }, { x: x + 1.6 * s, y: girdle }, { x, y: y + 4 * s }], '#a6ecff');
+      poly(ctx, [{ x: x - 2.6 * s, y: top }, { x: x - 0.4 * s, y: top }, { x: x - 1.6 * s, y: girdle }], '#ffffff');
+      break;
+    }
   }
 }
 

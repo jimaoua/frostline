@@ -3,6 +3,9 @@ import type { World } from './core/types';
 import { PLAYER_CAPACITY } from './core/constants';
 import { migrateProgress } from './progression/phases';
 import { buildCostFor, createWorld } from './world/createWorld';
+import { openStash } from './systems/build';
+import { levelCost } from './systems/levels';
+import { SPOTS } from './world/layout';
 import type { PadId } from './core/types';
 
 /**
@@ -78,9 +81,11 @@ export function loadWorld(): LoadedSave | null {
     const expected = PLAYER_CAPACITY + (w.upgrades.bigPacks ? 12 : 0) + 4 * Math.floor(lv / 3);
     w.player.capacity = Math.max(w.player.capacity, expected);
     migratePadCosts(w);
+    migrateRound2(w);
     migrateProgress(w);
     return { world: w, awaySeconds: Math.max(0, (Date.now() - file.savedAt) / 1000) };
-  } catch {
+  } catch (err) {
+    console.error('Save could not be loaded', err);
     return null;
   }
 }
@@ -113,3 +118,36 @@ function migratePadCosts(w: World): void {
     pad.parts = next.parts;
   }
 }
+
+/**
+ * Playtest round 2: nobody but the hero sells (haulers and the market porter
+ * are gone), the stash moved to the east yard and levels up, and Lv3–4 of
+ * the stations cost gold or diamonds from the new cave.
+ */
+function migrateRound2(w: World): void {
+  w.workers = w.workers.filter((wk) => wk.role !== 'hauler' && wk.role !== 'porter');
+  const porter = w.pads.porter;
+  if (porter && !porter.completed) {
+    porter.active = false;
+    porter.locked = false;
+  }
+  const stash = w.structures.stash;
+  stash.pos = { ...SPOTS.stash };
+  stash.built = false;
+  if (w.base.unlocked.has('east')) {
+    openStash(w);
+    stash.builtAt = -100; // already standing: no rise animation on every load
+  }
+  for (const id of Object.keys(w.pads) as PadId[]) {
+    const pad = w.pads[id];
+    if (pad.effect.type !== 'level' || pad.completed || !pad.level || pad.level < 3) continue;
+    const started = pad.paid > 0 || (pad.parts ?? []).some((p) => p.paid > 0);
+    if (started) continue;
+    const next = levelCost(pad.effect.station, pad.level);
+    pad.cost = next.cost;
+    pad.parts = next.parts;
+  }
+}
+
+// Test hook (dev builds only): lets the browser tests load a save directly.
+if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV && typeof window !== 'undefined') (window as unknown as { __loadWorld?: typeof loadWorld }).__loadWorld = loadWorld;

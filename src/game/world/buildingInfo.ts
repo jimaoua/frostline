@@ -14,7 +14,7 @@ export const BUILDING_INFO: Record<StructureId, { title: string; text: string }>
   tradeMat: { title: 'Trade Mat', text: 'Drop logs, stone or ore here to sell them. Coins pile up on the mat.' },
   quarryCamp: { title: 'Quarry Camp', text: 'Miners break rocks and fill the stonepile.' },
   stonepile: { title: 'Stonepile', text: "The miners' stone. Take it to a construction site." },
-  stash: { title: 'Stash', text: 'Step on with full hands to drop everything. Step on empty-handed to take things back.' },
+  stash: { title: 'Stash', text: 'Stop on it with full hands to drop everything; empty-handed to take things back. Upgrade it next door to hold more.' },
   tower1: { title: 'Watchtower', text: 'Shoots arrows at wolves that come too close.' },
   tower2: { title: 'Watchtower', text: 'Shoots arrows at wolves that come too close.' },
   tower3: { title: 'Lake Watchtower', text: 'Guards the west yard and the frozen lake.' },
@@ -23,5 +23,6 @@ export const BUILDING_INFO: Record<StructureId, { title: string; text: string }>
   smokehouse: { title: 'Smokehouse', text: 'Drop raw salmon here. It turns into valuable smoked salmon.' },
   market: { title: 'Fish Market', text: 'Sell smoked salmon on the mat for the best prices in camp.' },
   marketMat: { title: 'Market Mat', text: 'Drop smoked salmon here to sell it. Coins pile up on the mat.' },
+  mineLodge: { title: "Miners' Lodge", text: 'Lights the cave. Mine gold and diamonds there for the higher upgrade levels.' },
   lakeCamp: { title: "Ice Fishers' Hut", text: 'Ice fishers catch salmon at the holes in the frozen lake.' },
 };

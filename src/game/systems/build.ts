@@ -1,3 +1,4 @@
+import { lightCave } from './cave';
 import { DOOR_HP, HAULER_SPEED, WORKER_SPEED } from '../core/constants';
 import type { Pad, PadId, StructureId, UpgradeId, Vec, Worker, WorkerRole, World } from '../core/types';
 import { SPOTS } from '../world/layout';
@@ -5,6 +6,20 @@ import { burst, celebrate, popup, ring } from './effects';
 import { revealLake } from './lake';
 import { addXp, completeLevelPad } from './levels';
 import { makeMover } from './motion';
+
+/** The stash sits in the east yard: it opens with the yard (and its upgrade pad). */
+export function openStash(w: World): void {
+  const st = w.structures.stash;
+  if (!st.built) {
+    st.built = true;
+    st.builtAt = w.time;
+  }
+  const up = w.pads.upStash;
+  if (!up.completed && !up.active && !up.rearm && w.levels.stash < 2) {
+    up.active = true;
+    up.activatedAt = w.time;
+  }
+}
 
 export function activatePad(w: World, id: PadId): void {
   const p = w.pads[id];
@@ -44,6 +59,7 @@ export function completePad(w: World, pad: Pad): void {
       syncGateDefenses(w);
       celebrate(w, pad.pos, `${pad.label} unlocked!`);
       if (e.quadrant === 'west') revealLake(w);
+      if (e.quadrant === 'east') openStash(w);
       break;
     }
     case 'upgrade':
@@ -55,7 +71,8 @@ export function completePad(w: World, pad: Pad): void {
       celebrate(w, pad.pos, e.role === 'porter' ? 'Porter hired!' : 'New worker!');
       break;
     case 'hire':
-      spawnWorker(w, w.rng() < 0.5 ? 'lumberjack' : 'hauler', { x: pad.pos.x, y: pad.pos.y });
+      // New survivors work the piles; nobody but the hero sells.
+      spawnWorker(w, w.structures.quarryCamp.built && w.rng() < 0.5 ? 'miner' : 'lumberjack', { x: pad.pos.x, y: pad.pos.y });
       celebrate(w, pad.pos, 'New survivor!');
       w.morale = Math.min(100, w.morale + 6);
       break;
@@ -101,10 +118,13 @@ export function buildStructure(w: World, id: StructureId): void {
       spawnWorker(w, 'cook', at(0.9, 0.3));
       break;
     case 'tradingPost':
-      spawnWorker(w, 'hauler', at(-0.4, 1.2));
+      // No hauler: only the hero carries goods to the trade mat.
       break;
     case 'quarryCamp':
       spawnWorker(w, 'miner', at(-1.0, 0.2));
+      break;
+    case 'mineLodge':
+      lightCave(w);
       break;
     case 'lakeCamp':
       spawnWorker(w, 'icefisher', at(-0.6, 0.9));

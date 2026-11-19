@@ -30,7 +30,7 @@ export const MAX_FOOTPRINTS = 700;
 
 // Economy.
 export const FIRE_WOOD_REQUIRED = 6;
-export const SELL_PRICE = { wood: 2, stone: 4, ore: 12, fish: 2, meal: 6, salmon: 4, smoked: 18 } as const;
+export const SELL_PRICE = { wood: 2, stone: 4, ore: 12, fish: 2, meal: 6, salmon: 4, smoked: 18, gold: 25, diamond: 60 } as const;
 
 // Chapter 2: the frozen lake.
 export const SMOKE_TIME = 3.2;
@@ -43,9 +43,9 @@ export const MAX_QUEUE = 6;
 export const BOUNTY = { wolf: 5, bear: 25 } as const;
 
 // Resource nodes.
-export const NODE_AMOUNT = { tree: 4, rock: 5, ore: 3, icehole: 3 } as const;
+export const NODE_AMOUNT = { tree: 4, rock: 5, ore: 3, icehole: 3, gold: 3, diamond: 1 } as const;
 export const ELDER_WOOD = 8;
-export const REGROW = { tree: 22, rock: 30, ore: 45, icehole: 16 } as const;
+export const REGROW = { tree: 22, rock: 30, ore: 45, icehole: 16, gold: 50, diamond: 80 } as const;
 
 // Defense.
 export const WAVE_INTERVAL = 75;
@@ -81,4 +81,5 @@ export const SITE_STRUCTURES: ReadonlySet<string> = new Set([
   'tower1',
   'tower2',
   'tower3',
+  'mineLodge',
 ]);
