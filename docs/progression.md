@@ -125,3 +125,24 @@ Progress is weighted per unit: $1 = 1, log = 4, stone = 6, ore = 15. Every
 landing nudges the site. Each new stage pops it, throws dust and wood or stone
 chips, and plays the "stage" sound with a medium haptic. Expansions and
 upgrades take materials too, but have no construction stages yet.
+
+## Playtest round 1 (friends' feedback)
+* **Kitchen spots:** the grill and the serving counter each have a glowing
+  "stand here" tile with the item they take. The grill spot is in front of
+  the grill, the counter spot just inside the counter. A spot turns gold and
+  pulses when you carry something for it. The guide arrow points at them.
+* **Locked pads:** "coming next" pads show a small lock chip instead of their
+  full price, so they no longer cover the stations in use.
+* **Tap a building:** you see its name and a one-line description for 5 s
+  (`world/buildingInfo.ts`). Tapping empty ground closes it.
+* **Top-left counts:** money, plus what is in your arms right now (logs and
+  stone always; ore, fish, meals, salmon only while carried). Before, these
+  chips showed the woodpile, which the hauler kept emptying.
+* **Storage lists:** two buttons under the counts. "Stash" lists what you
+  stored. "Workers" lists the workers' stockpiles: woodpile, stonepile, grill
+  tray, counter, cash pad, trade mat, smokehouse and market mat.
+* **Stash** (starting yard, west of the south gate): stop on it with full
+  hands and everything you carry (never money) drops in. Stop on it
+  empty-handed and you take things back, starting with what open buildings
+  need. A visit only goes one way, and walking across never triggers it.
+  The stash is saved; old saves start with an empty one.

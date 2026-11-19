@@ -16,7 +16,7 @@ const KEY = 'frostline.save.v1';
 const VERSION = 1;
 
 /** World keys that are rebuilt or transient, never stored. */
-const SKIP = new Set<keyof World>(['rng', 'base', 'flyers', 'particles', 'popups', 'arrows', 'footprints', 'sfx', 'toast']);
+const SKIP = new Set<keyof World>(['rng', 'base', 'flyers', 'particles', 'popups', 'arrows', 'footprints', 'sfx', 'toast', 'info']);
 
 interface SaveFile {
   version: number;

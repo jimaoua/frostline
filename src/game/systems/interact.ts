@@ -7,7 +7,7 @@ import { completePad } from './build';
 import { addFlyer, burst, cashTopZ, popup, ring, sfx, stackTopZ } from './effects';
 import { iceSplash, lakeInteractions } from './lake';
 import { clearPadFeel, feel, padFeel, padShown, padShownRatio, stageOf, streak, streakGap, tally, trackPart } from './feel';
-import { addPaid, padFullyPaid, padParts } from './padcost';
+import { addPaid, openNeed, padFullyPaid, padParts } from './padcost';
 import { SITE_FINISH_FROM, SITE_STRUCTURES } from '../core/constants';
 
 const playerTarget = (w: World) => () => w.player.pos;
@@ -48,6 +48,8 @@ export function updatePlayerInteractions(w: World, dt: number): void {
   const full = p.carry.length >= p.capacity;
 
   const fs = feel(w);
+  // Leaving the stash ends the visit (whatever else happens this frame).
+  if (dist(p.pos, S.stash.pos) >= STASH_RADIUS) fs.stashMode = null;
   for (const pad of Object.values(w.pads)) {
     if (!pad.active) continue;
     const h = pad.size / 2;
@@ -109,7 +111,7 @@ export function updatePlayerInteractions(w: World, dt: number): void {
   }
 
   // Grill: drop raw fish, pick up cooked meals.
-  if (S.grill.built && dist(p.pos, S.grill.pos) < 1.15) {
+  if (S.grill.built && (dist(p.pos, S.grill.pos) < 1.15 || dist(p.pos, SPOTS.grillZone) < 0.6)) {
     const hasRaw = p.carry.includes('fish');
     // Once a cook runs the kitchen, only lend a hand when the hatch runs dry.
     const cooking = w.workers.some((x) => x.role === 'cook');
@@ -132,6 +134,10 @@ export function updatePlayerInteractions(w: World, dt: number): void {
       return;
     }
   }
+
+  // Stash: step on with full hands to drop everything (never money); step on
+  // empty-handed to take things back, what open buildings need first.
+  if (S.stash.built && dist(p.pos, S.stash.pos) < STASH_RADIUS && stashStep(w)) return;
 
   if (S.woodpile.built && dist(p.pos, S.woodpile.pos) < 0.95 && w.stock.wood > 0 && !full) {
     if (p.transferT <= 0) {
@@ -331,6 +337,59 @@ function wantsStone(w: World): boolean {
     for (const part of padParts(pad)) if (part.kind === 'stone' && part.amount - part.paid > have) return true;
   }
   return false;
+}
+
+const STASH_RADIUS = 0.75;
+const STASH_ORDER: Carryable[] = ['wood', 'stone', 'ore', 'fish', 'meal', 'salmon', 'smoked'];
+
+/**
+ * One stash transfer. The visit's direction is fixed when you step on, so
+ * dropping your load never turns into picking it straight back up: leave the
+ * stash and step on again to take things out.
+ */
+function stashStep(w: World): boolean {
+  const p = w.player;
+  const fs = feel(w);
+  const stash = w.stash;
+  if (fs.stashMode === null) {
+    fs.stashMode = p.carry.length > 0 ? 'drop' : 'take';
+    fs.stashSince = w.time;
+  }
+  // Only when you stop on it: walking across the stash never empties your arms.
+  if (Math.hypot(p.vel.x, p.vel.y) > 0.6) fs.stashSince = w.time;
+  if (w.time - fs.stashSince < 0.3) return false;
+  const at = w.structures.stash.pos;
+  if (fs.stashMode === 'drop') {
+    if (p.carry.length === 0) return false;
+    if (p.transferT > 0) return true;
+    const kind = p.carry.pop()!;
+    stash[kind] = (stash[kind] ?? 0) + 1;
+    const st = streak(w, 'stashDrop', () => 1);
+    const heavy = kind === 'stone' || kind === 'ore';
+    addFlyer(w, kind, p.pos, stackTopZ(p.carry.length + 1), at, 10, heavy ? 0.26 : 0.24, heavy ? 16 : 24, () => {
+      w.structures.stash.bumpAt = w.time;
+    });
+    p.transferT = streakGap(st.n, 0.08, 0.03);
+    return true;
+  }
+  if (p.carry.length >= p.capacity) return false;
+  const kind = stashPick(w);
+  if (!kind) return false;
+  if (p.transferT > 0) return true;
+  stash[kind] = (stash[kind] ?? 0) - 1;
+  p.carry.push(kind);
+  w.structures.stash.bumpAt = w.time;
+  const st = streak(w, 'stashTake', () => 1);
+  addFlyer(w, kind, at, 12, playerTarget(w), stackTopZ(p.carry.length), 0.24, 20);
+  p.transferT = streakGap(st.n, 0.08, 0.03);
+  return true;
+}
+
+/** What to take out next: whatever an open building still needs, then anything. */
+function stashPick(w: World): Carryable | null {
+  for (const kind of STASH_ORDER) if ((w.stash[kind] ?? 0) > 0 && openNeed(w, kind) > 0) return kind;
+  for (const kind of STASH_ORDER) if ((w.stash[kind] ?? 0) > 0) return kind;
+  return null;
 }
 
 function canHarvest(w: World, n: ResourceNode): boolean {

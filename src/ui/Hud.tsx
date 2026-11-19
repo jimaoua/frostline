@@ -29,6 +29,7 @@ export function Hud({ game }: { game: Game }) {
         <div className="hud__col">
           {hud.camp && <CampLevel c={hud.camp} />}
           {hud.resources && <ResourceBar r={hud.resources} morale={hud.morale} />}
+          {hud.storage && <StorageButtons s={hud.storage} />}
           {hud.vitals && <Vitals v={hud.vitals} />}
         </div>
         <div className="hud__col hud__col--right">
@@ -43,6 +44,12 @@ export function Hud({ game }: { game: Game }) {
       </div>
       <ObjectiveCard hud={hud} />
       {hud.event && <EventCard e={hud.event} />}
+      {hud.info && (
+        <div className="infocard" key={hud.info.id}>
+          <b>{hud.info.title}</b>
+          <span>{hud.info.text}</span>
+        </div>
+      )}
       {hud.toast && (
         <div className={`toast toast--${hud.toast.kind}`} key={hud.toast.id}>
           <b>{hud.toast.title}</b>
@@ -150,6 +157,7 @@ function CampLevel({ c }: { c: NonNullable<HudSnapshot['camp']> }) {
   );
 }
 
+/** Money on your back, and the items in your arms (they change as you pick up and drop). */
 function ResourceBar({ r, morale }: { r: NonNullable<HudSnapshot['resources']>; morale: HudSnapshot['morale'] }) {
   return (
     <div className="resources">
@@ -159,18 +167,14 @@ function ResourceBar({ r, morale }: { r: NonNullable<HudSnapshot['resources']>; 
           ${r.coins}
         </b>
       </span>
-      <span className="chip">
-        <i className="ico ico--wood" />
-        <b key={r.wood} className="bump">
-          {r.wood}
-        </b>
-      </span>
-      <span className="chip">
-        <i className="ico ico--stone" />
-        <b key={r.stone} className="bump">
-          {r.stone}
-        </b>
-      </span>
+      {r.carry.map((c) => (
+        <span className={`chip ${c.n === 0 ? 'chip--empty' : ''}`} key={c.kind}>
+          <i className={`ico ico--${c.kind}`} />
+          <b key={c.n} className="bump">
+            {c.n}
+          </b>
+        </span>
+      ))}
       {morale && (
         <span className={`chip chip--morale ${morale.value < 35 ? 'chip--low' : ''}`}>
           <i className="ico ico--morale" />
@@ -180,6 +184,66 @@ function ResourceBar({ r, morale }: { r: NonNullable<HudSnapshot['resources']>; 
     </div>
   );
 }
+
+const stopPointer = (e: RPointerEvent) => e.stopPropagation();
+
+/**
+ * Two separate lists, each behind its own button: what you keep in the
+ * stash, and what the workers have stockpiled around the camp.
+ */
+function StorageButtons({ s }: { s: NonNullable<HudSnapshot['storage']> }) {
+  const [open, setOpen] = useState<'stash' | 'workers' | null>(null);
+  const toggle = (k: 'stash' | 'workers') => setOpen(open === k ? null : k);
+  const stashTotal = s.stash.reduce((a, x) => a + x.n, 0);
+  return (
+    <div className="storage" onPointerDown={stopPointer}>
+      <div className="storage__btns">
+        <button type="button" className={`storebtn ${open === 'stash' ? 'storebtn--on' : ''}`} onClick={() => toggle('stash')}>
+          <i className="ico ico--crate" /> Stash <b>{stashTotal}</b>
+        </button>
+        <button type="button" className={`storebtn ${open === 'workers' ? 'storebtn--on' : ''}`} onClick={() => toggle('workers')}>
+          <i className="ico ico--worker" /> Workers
+        </button>
+      </div>
+      {open === 'stash' && (
+        <div className="storepanel">
+          <h4>Your stash</h4>
+          {s.stash.length === 0 && <p>Empty. Step on the stash with full hands to drop things off.</p>}
+          {s.stash.map((x) => (
+            <div className="storerow" key={x.kind}>
+              <i className={`ico ico--${x.kind}`} />
+              <span>{ITEM_NAME[x.kind]}</span>
+              <b>{x.n}</b>
+            </div>
+          ))}
+        </div>
+      )}
+      {open === 'workers' && (
+        <div className="storepanel">
+          <h4>Workers' stock</h4>
+          {s.workers.map((x) => (
+            <div className="storerow" key={x.id}>
+              <i className={`ico ico--${x.kind}`} />
+              <span>{x.label}</span>
+              <b>{x.kind === 'coin' ? `$${x.n}` : x.n}</b>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ITEM_NAME: Record<string, string> = {
+  wood: 'Logs',
+  stone: 'Stone',
+  ore: 'Ore',
+  fish: 'Fish',
+  meal: 'Meals',
+  salmon: 'Salmon',
+  smoked: 'Smoked salmon',
+  coin: 'Cash',
+};
 
 function Vitals({ v }: { v: NonNullable<HudSnapshot['vitals']> }) {
   return (

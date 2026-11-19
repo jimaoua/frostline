@@ -26,6 +26,9 @@ interface FeelState {
   tallySum: number;
   stackBumpAt: number;
   wasFull: boolean;
+  /** Direction of the current stash visit, fixed when you step on. */
+  stashMode: 'drop' | 'take' | null;
+  stashSince: number;
 }
 
 interface PadFeel {
@@ -43,7 +46,7 @@ const pads = new WeakMap<Pad, PadFeel>();
 export function feel(w: World): FeelState {
   let s = worlds.get(w);
   if (!s) {
-    s = { streaks: new Map(), onPad: null, padSince: 0, tally: null, tallySum: 0, stackBumpAt: -10, wasFull: false };
+    s = { streaks: new Map(), onPad: null, padSince: 0, tally: null, tallySum: 0, stackBumpAt: -10, wasFull: false, stashMode: null, stashSince: 0 };
     worlds.set(w, s);
   }
   return s;

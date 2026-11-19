@@ -1,7 +1,7 @@
 import { screenDirToWorldDir } from '../core/iso';
 import { BUILD_TIME } from '../core/constants';
 import { clamp } from '../core/math';
-import type { Caravan, GateDoor, Kitchen, Pad, Trap, Tower, Vec, World } from '../core/types';
+import type { Caravan, GateDoor, ItemKind, Kitchen, Pad, Trap, Tower, Vec, World } from '../core/types';
 import type { GateDef } from '../world/layout';
 import { padShownRatio } from '../systems/feel';
 import { drawItem } from './items';
@@ -917,3 +917,27 @@ export function drawGhost(ctx: Ctx, pad: Pad, sx: number, sy: number, time: numb
   ctx.restore();
 }
 
+
+/** Stacks on the stash deck: one small column per kind, with its count. */
+export function drawStashPiles(ctx: Ctx, stash: Partial<Record<ItemKind, number>>, bumpAt: number, sx: number, sy: number, time: number): void {
+  const kinds = (Object.keys(stash) as ItemKind[]).filter((k) => (stash[k] ?? 0) > 0);
+  if (!kinds.length) return;
+  const sq = bumpScale(bumpAt, time);
+  // Columns along the back edge of the deck, left to right.
+  const slots: [number, number][] = [[-0.45, -0.45], [-0.05, -0.55], [0.35, -0.6], [-0.55, -0.05], [0.45, -0.2], [-0.5, 0.35], [0.5, 0.2]];
+  kinds.slice(0, slots.length).forEach((kind, i) => {
+    const n = stash[kind] ?? 0;
+    const [cx, cy] = slots[i];
+    const p = rel(cx, cy);
+    const shown = Math.min(n, 10);
+    for (let k = 0; k < shown; k++) drawItem(ctx, kind, sx + p.x, sy + p.y - 3 - k * 3.6 * sq, 1);
+    const top = sy + p.y - 10 - shown * 3.6 * sq;
+    ctx.font = '900 10px system-ui';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(20,30,45,0.85)';
+    ctx.strokeText(`${n}`, sx + p.x, top);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${n}`, sx + p.x, top);
+  });
+}

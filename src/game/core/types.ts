@@ -23,6 +23,7 @@ export type StructureId =
   | 'tradeMat'
   | 'quarryCamp'
   | 'stonepile'
+  | 'stash'
   | 'tower1'
   | 'tower2'
   | 'workshop'
@@ -458,6 +459,10 @@ export interface World {
   kitchen: Kitchen;
   coins: number;
   coinPile: number;
+  /** Items the player left in the stash (never money). */
+  stash: Partial<Record<Carryable, number>>;
+  /** Building the player tapped, shown in the info card for a few seconds. */
+  info: { id: StructureId; at: number } | null;
   smoke: Smokehouse;
   /** Cash the market porter has earned, waiting on the market mat. */
   marketCash: number;

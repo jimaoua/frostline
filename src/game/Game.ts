@@ -293,6 +293,17 @@ export class Game {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     const running = this.mode === 'playing' && !this.world.gameOver;
+    // A tap on a building shows what it is; a tap on empty ground closes it.
+    const tap = this.input.takeTap();
+    if (tap && this.mode === 'playing') {
+      const id = this.renderer.pickStructure(this.world, tap.x, tap.y);
+      this.world.info = id ? { id, at: this.world.time } : null;
+      if (id) {
+        this.world.structures[id].bumpAt = this.world.time;
+        haptic('light');
+      }
+      this.publish();
+    }
     if (running) {
       this.update(dt, this.input.worldDirection());
       this.trackIncome(dt);

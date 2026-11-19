@@ -102,7 +102,7 @@ function nearestIceHole(w: World): Vec | null {
 function kitchenTarget(w: World): Vec {
   const k = w.kitchen;
   if (carrying(w, 'meal') > 0) return SPOTS.counterServe;
-  if (carrying(w, 'fish') > 0 || k.tray > 0) return w.structures.grill.pos;
+  if (carrying(w, 'fish') > 0 || k.tray > 0) return SPOTS.grillZone;
   return SPOTS.fishSpot;
 }
 
@@ -239,7 +239,7 @@ export const PHASES: PhaseDef[] = [
         1,
         'Drop fish at the grill. It cooks by itself.',
         undefined,
-        (w) => (carrying(w, 'fish') > 0 || w.kitchen.raw > 0 ? w.structures.grill.pos : SPOTS.fishSpot),
+        (w) => (carrying(w, 'fish') > 0 || w.kitchen.raw > 0 ? SPOTS.grillZone : SPOTS.fishSpot),
       ),
       countStep(
         'serve',

@@ -65,7 +65,10 @@ export const SPOTS = {
   fishSpot: { x: 18.55, y: 21.3 },
   grill: { x: 21.5, y: 17.5 },
   counter: { x: 22.5, y: 24.0 },
-  counterServe: { x: 22.5, y: 23.35 },
+  // Where you stand to serve: in front of the counter, clear of it on screen.
+  counterServe: { x: 22.4, y: 23.0 },
+  // Where you stand to hand fish to the grill and take meals off it.
+  grillZone: { x: 21.4, y: 18.5 },
   cashPad: { x: 23.4, y: 22.4 },
   // Survivors queue outside the south wall, then walk the road.
   queueHead: { x: 22.5, y: 24.9 },
@@ -79,6 +82,8 @@ export const SPOTS = {
   tradeMat: { x: 27.6, y: 19.9 },
   quarryCamp: { x: 29.8, y: 22.4 },
   stonepile: { x: 26.0, y: 22.5 },
+  // Drop-off for anything you carry (never money), in the starting yard.
+  stash: { x: 18.9, y: 23.1 },
   tower1: { x: 16.9, y: 23.1 },
   expandNorth: { x: 20.0, y: 16.8 },
   tower2: { x: 30.8, y: 17.2 },

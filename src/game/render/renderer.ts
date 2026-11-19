@@ -9,7 +9,7 @@ import { QUADRANTS, SPOTS } from '../world/layout';
 import { drawHuman, drawWolf } from './characters';
 import { padBumpAt, padShownRatio, padStageAt, stackSquash } from '../systems/feel';
 import { SITE_STRUCTURES } from '../core/constants';
-import { drawExpandZone, drawFireRing, drawPad, drawPadBadge, drawWarmZone } from './floor';
+import { drawStashFloor, drawStationZone, drawExpandZone, drawFireRing, drawPad, drawPadBadge, drawWarmZone } from './floor';
 import { drawArrows, drawFireGlow, drawFlyers, drawFootprints, drawParticles, drawPopups, Snowfall } from './fx';
 import { drawBaseEdges, drawGround, type View } from './ground';
 import { drawIceHole, drawLake, drawLakeCamp, drawMarket, drawSmokehouse } from './lake';
@@ -40,6 +40,7 @@ import {
   drawWorkshop,
   sledPos,
   withSite,
+  drawStashPiles,
   type SiteState,
 } from './structures';
 
@@ -99,6 +100,30 @@ export class Renderer {
     const t = toScreen(w.player.pos.x, w.player.pos.y);
     this.cam = { x: t.x, y: t.y - 30 };
     this.camReady = true;
+  }
+
+  /**
+   * The building under a tap (CSS px inside the canvas), front-most first.
+   * Boxes are generous so a fingertip on the roof or the base both count.
+   */
+  pickStructure(w: World, cssX: number, cssY: number): StructureId | null {
+    const sx = this.cam.x + (cssX - this.vw / 2) / this.zoom;
+    const sy = this.cam.y + (cssY - this.vh / 2) / this.zoom;
+    let best: StructureId | null = null;
+    let bestDepth = -Infinity;
+    for (const st of Object.values(w.structures)) {
+      if (!st.built) continue;
+      const a = toScreen(st.pos.x, st.pos.y);
+      const halfW = Math.max(24, st.radius * 32 * 1.4 + 14);
+      const h = PICK_HEIGHT[st.id] ?? (st.radius > 0 ? 64 : 22);
+      if (Math.abs(sx - a.x) > halfW || sy < a.y - h || sy > a.y + 18) continue;
+      const depth = st.pos.x + st.pos.y;
+      if (depth > bestDepth) {
+        bestDepth = depth;
+        best = st.id;
+      }
+    }
+    return best;
   }
 
   render(w: World, input: Input, dt: number): void {
@@ -177,6 +202,24 @@ export class Renderer {
     if (S.cashPad.built) {
       const s = toScreen(S.cashPad.pos.x, S.cashPad.pos.y);
       drawCashPad(ctx, w.kitchen.cash, S.cashPad.bumpAt, s.x, s.y, time);
+    }
+    // Stand-here spots for the kitchen: hand fish to the grill, serve meals.
+    const near = (q: { x: number; y: number }, r: number) => Math.hypot(p.pos.x - q.x, p.pos.y - q.y) < r;
+    if (S.grill.built) {
+      const z = SPOTS.grillZone;
+      const s = toScreen(z.x, z.y);
+      const fish = p.carry.includes('fish');
+      const kind = fish || w.kitchen.tray === 0 ? 'fish' : 'meal';
+      drawStationZone(ctx, w, kind, s.x, s.y, fish || (w.kitchen.tray > 0 && p.carry.length < p.capacity), near(z, 0.6));
+    }
+    if (S.counter.built) {
+      const z = SPOTS.counterServe;
+      const s = toScreen(z.x, z.y);
+      drawStationZone(ctx, w, 'meal', s.x, s.y, p.carry.includes('meal'), near(z, 0.6));
+    }
+    if (S.stash.built) {
+      const s = toScreen(S.stash.pos.x, S.stash.pos.y);
+      drawStashFloor(ctx, w, s.x, s.y, p.carry.length > 0, near(S.stash.pos, 0.75));
     }
     for (const t of w.traps) {
       const s = toScreen(t.pos.x, t.pos.y);
@@ -266,6 +309,10 @@ export class Renderer {
           break;
         case 'stonepile':
           draw = () => drawPile(ctx, 'stone', w.stock.stone, s.x, s.y, st.bumpAt, time);
+          break;
+        case 'stash':
+          draw = () => drawStashPiles(ctx, w.stash, st.bumpAt, s.x, s.y, time);
+          dd = -0.3;
           break;
         case 'smokehouse':
           draw = () => drawSmokehouse(ctx, w.smoke, st.bumpAt, s.x, s.y, time, b, night);
@@ -637,3 +684,15 @@ function siteFor(w: World, id: StructureId): SiteState | null {
   if (q <= 0) return null;
   return { q, stageAt: padStageAt(pad), bumpAt: padBumpAt(pad) };
 }
+
+/** How tall each building stands on screen, for tap picking (px above its base). */
+const PICK_HEIGHT: Partial<Record<StructureId, number>> = {
+  campfire: 40,
+  grill: 46,
+  counter: 46,
+  tower1: 110,
+  tower2: 110,
+  tower3: 110,
+  workshop: 80,
+  shelter: 80,
+};

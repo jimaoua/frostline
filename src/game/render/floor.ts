@@ -255,6 +255,27 @@ export function drawPadBadge(ctx: Ctx, w: World, pad: Pad, sx: number, sy: numbe
   const appear = Math.max(0.01, easeOutBack(clamp((w.time - pad.activatedAt) / 0.5, 0, 1)));
   const k = appear * padBump(pad, w.time);
   const parts = padParts(pad);
+  // A locked "coming next" pad is only a small lock chip: its full price would
+  // crowd the stations you are using right now (the grill, the counter).
+  if (locked) {
+    ctx.save();
+    ctx.translate(sx, sy - 6);
+    ctx.scale((k * 0.62) / scale, (k * 0.62) / scale);
+    ctx.globalAlpha = 0.7;
+    roundRectPath(ctx, -34, -27, 68, 54, 27);
+    ctx.fillStyle = 'rgba(40,48,60,0.55)';
+    ctx.fill();
+    drawItem(ctx, parts[0].kind, -10, 0, 1.6);
+    ctx.translate(14, 2);
+    ctx.fillStyle = '#3a4352';
+    ctx.beginPath();
+    ctx.arc(0, 0, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.scale(0.7, 0.7);
+    icon(ctx, 'lock');
+    ctx.restore();
+    return;
+  }
   ctx.save();
   // Under a building pad the rows hang below its front edge, a little smaller.
   const sc = below ? 0.82 : 1;
@@ -434,5 +455,88 @@ export function drawWarmZone(ctx: Ctx, sx: number, sy: number, radius: number, t
     ctx.setLineDash([0.25, 0.15]);
     ctx.stroke();
     ctx.setLineDash([]);
+  });
+}
+
+/**
+ * A "stand here" spot for a station (grill hand-off, serving counter): a
+ * glowing floor tile with the item it takes. It lights up gold and pulses
+ * when you carry something for it, like a pad you can afford.
+ */
+export function drawStationZone(ctx: Ctx, w: World, kind: ItemKind, sx: number, sy: number, ready: boolean, on: boolean): void {
+  onGround(ctx, sx, sy, () => {
+    ctx.scale(1 / 32, 1 / 32);
+    const half = 17 * (on ? 1.06 : 1);
+    if (ready || on) {
+      const pulse = 0.5 + Math.sin(w.time * 6) * 0.5;
+      roundRectPath(ctx, -half - 6, -half - 6, half * 2 + 12, half * 2 + 12, 12);
+      ctx.strokeStyle = `rgba(255,214,77,${0.45 + pulse * 0.55})`;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+    roundRectPath(ctx, -half, -half, half * 2, half * 2, 9);
+    ctx.fillStyle = ready ? 'rgba(120,80,10,0.55)' : 'rgba(26,34,48,0.6)';
+    ctx.fill();
+    roundRectPath(ctx, -half + 4, -half + 4, half * 2 - 8, half * 2 - 8, 6);
+    ctx.strokeStyle = ready ? '#ffd64d' : 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([9, 5]);
+    ctx.lineDashOffset = -w.time * 18;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+  // The item it takes, standing up so it reads from any angle.
+  const bob = ready ? Math.sin(w.time * 5) * 2 : 0;
+  ctx.save();
+  ctx.globalAlpha = ready ? 1 : 0.75;
+  drawItem(ctx, kind, sx, sy - 4 - bob, 1.5);
+  ctx.restore();
+}
+
+/** The stash floor: a plank deck with a down arrow (drop) or up arrow (take). */
+export function drawStashFloor(ctx: Ctx, w: World, sx: number, sy: number, carrying: boolean, on: boolean): void {
+  onGround(ctx, sx, sy, () => {
+    ctx.scale(1 / 32, 1 / 32);
+    const half = 22;
+    if (on) {
+      const pulse = 0.5 + Math.sin(w.time * 6) * 0.5;
+      roundRectPath(ctx, -half - 6, -half - 6, half * 2 + 12, half * 2 + 12, 12);
+      ctx.strokeStyle = `rgba(255,214,77,${0.45 + pulse * 0.55})`;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+    roundRectPath(ctx, -half, -half, half * 2, half * 2, 8);
+    ctx.fillStyle = '#9a6a42';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(60,36,18,0.6)';
+    ctx.lineWidth = 2;
+    for (let x = -half + 9; x < half; x += 9) {
+      ctx.beginPath();
+      ctx.moveTo(x, -half + 2);
+      ctx.lineTo(x, half - 2);
+      ctx.stroke();
+    }
+    roundRectPath(ctx, -half, -half, half * 2, half * 2, 8);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([9, 5]);
+    ctx.lineDashOffset = -w.time * 18;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Arrow: points into the deck when you carry something, out when empty.
+    ctx.save();
+    if (!carrying) ctx.rotate(Math.PI);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.moveTo(-6, -14);
+    ctx.lineTo(6, -14);
+    ctx.lineTo(6, 0);
+    ctx.lineTo(13, 0);
+    ctx.lineTo(0, 13);
+    ctx.lineTo(-13, 0);
+    ctx.lineTo(-6, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   });
 }

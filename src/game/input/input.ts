@@ -21,6 +21,9 @@ export class Input {
   readonly stick: StickState = { active: false, ox: 0, oy: 0, x: 0, y: 0 };
   private keys = new Set<string>();
   private pointerId: number | null = null;
+  private down = { x: 0, y: 0, t: 0, moved: 0 };
+  /** A short press that barely moved: a tap on the world (CSS px in the canvas). */
+  private tap: Vec | null = null;
 
   constructor(private el: HTMLElement) {
     el.addEventListener('pointerdown', this.onDown);
@@ -78,12 +81,14 @@ export class Input {
     this.pointerId = e.pointerId;
     const p = this.local(e);
     Object.assign(this.stick, { active: true, ox: p.x, oy: p.y, x: p.x, y: p.y });
+    this.down = { x: p.x, y: p.y, t: performance.now(), moved: 0 };
     e.preventDefault();
   };
 
   private onMove = (e: PointerEvent) => {
     if (e.pointerId !== this.pointerId) return;
     const p = this.local(e);
+    this.down.moved = Math.max(this.down.moved, Math.hypot(p.x - this.down.x, p.y - this.down.y));
     let dx = p.x - this.stick.ox;
     let dy = p.y - this.stick.oy;
     const d = Math.hypot(dx, dy);
@@ -103,7 +108,15 @@ export class Input {
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
     this.stick.active = false;
+    if (e.type === 'pointerup' && this.down.moved < 12 && performance.now() - this.down.t < 320) this.tap = { x: this.down.x, y: this.down.y };
   };
+
+  /** The last tap, once (null if none since the last call). */
+  takeTap(): Vec | null {
+    const t = this.tap;
+    this.tap = null;
+    return t;
+  }
 
   private onKey = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
