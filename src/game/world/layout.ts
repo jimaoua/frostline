@@ -62,6 +62,10 @@ export const SPOTS = {
   hub: { x: 20.4, y: 21.6 },
   // Kitchen loop (core).
   fishPond: { x: 17.6, y: 21.3 },
+  // Where the fisher (Pine Valley: the hunter) works.
+  fisherSpot: { x: 17.6, y: 20.35 },
+  // By the south gate: the sled that leaves for the next refuge.
+  sled: { x: 18.1, y: 25.0 },
   fishSpot: { x: 18.55, y: 21.3 },
   grill: { x: 21.5, y: 17.5 },
   counter: { x: 22.5, y: 24.0 },
@@ -122,6 +126,18 @@ export const SPOTS = {
 
 const ROCK_ZONE: Rect = { x: 34, y: 15, w: 6.5, h: 10 };
 
+/** Pine Valley: the open meadows where deer graze (outside the yard). */
+export const MEADOWS: Vec[] = [
+  { x: 12.4, y: 29.4 },
+  { x: 32.0, y: 27.6 },
+];
+export const MEADOW_R = 2.5;
+export const inMeadow = (x: number, y: number, m = 0) => MEADOWS.some((c) => Math.hypot(c.x - x, c.y - y) < MEADOW_R + m);
+/** Pine Valley: the frozen river, a band along x + y = c (runs left-right across the screen, south of the camp). */
+export const RIVER = { c: 63, half: 1.05 };
+export const riverOffset = (x: number, y: number) => (x + y - RIVER.c) / Math.SQRT2;
+export const inRiver = (x: number, y: number, m = 0) => Math.abs(riverOffset(x, y) + 0.35 * Math.sin((x - y) * 0.22)) < RIVER.half + m;
+
 /** Chapter 8: the cave floor (world-space ellipse) below the mountain at the map's north edge. */
 export const CAVE = { x: 20, y: 3.6, rx: 3.6, ry: 2.2 };
 export const CAVE_MOUTH = { x: 20, y: 1.9 };
@@ -170,7 +186,8 @@ const inRect = (r: Rect, x: number, y: number, m = 0) =>
   x > r.x - m && x < r.x + r.w + m && y > r.y - m && y < r.y + r.h + m;
 
 /** Trees ring the base (with decorative forest beyond the map edge); rocks sit east. */
-export function generateNodes(rng: () => number): ResourceNode[] {
+export function generateNodes(rng: () => number, worldId: 1 | 2 = 1): ResourceNode[] {
+  const valley = worldId === 2;
   const nodes: ResourceNode[] = [];
   let id = 1;
   // The west yard keeps its forest until Chapter 2 clears it.
@@ -212,20 +229,24 @@ export function generateNodes(rng: () => number): ResourceNode[] {
       const y = gy + (rng() - 0.5) * 0.9;
       if (rects.some((r) => inRect(r, x, y, 1.3))) continue;
       if (gateOuts.some((g) => Math.hypot(g.x - x, g.y - y) < 1.9)) continue;
-      if (inRect(ROCK_ZONE, x, y, 0.8)) continue;
+      if (!valley && inRect(ROCK_ZONE, x, y, 0.8)) continue;
+      if (valley && (inRiver(x, y, 0.4) || inMeadow(x, y))) continue;
       // Keep the corridor between the east gate and the quarry open.
       if (x > 32 && x < 35 && y > 18 && y < 22) continue;
       // Survivor queue lane and the road south.
       if (inQueueLane(x, y)) continue;
       const inMap = x >= 1.5 && x <= MAP_SIZE - 1.5 && y >= 1.5 && y <= MAP_SIZE - 1.5;
       const nearBase = Math.hypot(x - 22, y - 19) < 13;
-      const density = inMap ? (nearBase ? 0.24 : 0.5) : 0.85;
+      const density = inMap ? (nearBase ? (valley ? 0.3 : 0.24) : valley ? 0.62 : 0.5) : 0.85;
       if (rng() > density) continue;
       const elder = inMap && farOut(x, y) && rng() < 0.07;
       if (!free(x, y, elder ? 1.4 : 0.95)) continue;
       addTree(x, y, inMap, elder);
     }
   }
+
+  // Pine Valley: no quarry or ore in the first chapters, only forest.
+  if (valley) return nodes;
 
   // Rocks: hidden until stone mining unlocks.
   const addRock = (kind: 'rock' | 'ore', x: number, y: number) => {

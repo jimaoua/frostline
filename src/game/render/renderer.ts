@@ -16,6 +16,8 @@ import { drawBaseEdges, drawGround, type View } from './ground';
 import { drawIceHole, drawLake, drawLakeCamp, drawMarket, drawSmokehouse } from './lake';
 import { LightMap, type Light } from './lighting';
 import { drawNode } from './nature';
+import { drawDeer, drawSledMarker, drawValleyGround } from './valley';
+import { setItemSkin } from './items';
 import { PLAYER_STYLE, SURVIVOR_STYLES, TRADER_STYLE, WORKER_STYLES } from './palette';
 import { SpriteCache } from './sprites';
 import { drawPillar, drawPost } from './stockade';
@@ -163,7 +165,9 @@ export class Renderer {
       sx > view.x0 - m && sx < view.x1 + m && sy > view.y0 - m * 0.4 && sy < view.y1 + m * 1.8;
 
     /* ---------- Ground layer ---------- */
+    setItemSkin(w.worldId);
     drawGround(ctx, w, view, time);
+    if (w.worldId === 2) drawValleyGround(ctx, time);
     // Chapter 2: the frozen lake and its fishing holes lie flat on the ground.
     if (w.flags.lake) {
       drawLake(ctx, time);
@@ -289,7 +293,7 @@ export class Renderer {
           dd = 0.4;
           break;
         case 'fishShack':
-          draw = () => drawFishShack(ctx, s.x, s.y, time, b, night);
+          draw = () => drawFishShack(ctx, s.x, s.y, time, b, night, w.worldId === 2);
           dd = 0.3;
           break;
         case 'tradingPost':
@@ -365,7 +369,15 @@ export class Renderer {
       const s = toScreen(wk.pos.x, wk.pos.y);
       if (!visible(s.x, s.y)) continue;
       const tool =
-        wk.role === 'lumberjack' ? 'axe' : wk.role === 'miner' ? 'pick' : (wk.role === 'fisher' || wk.role === 'icefisher') && wk.state === 'working' ? 'rod' : null;
+        wk.role === 'lumberjack'
+          ? 'axe'
+          : wk.role === 'miner'
+            ? 'pick'
+            : wk.role === 'fisher' && w.worldId === 2 && wk.state === 'working'
+              ? 'bow'
+              : (wk.role === 'fisher' || wk.role === 'icefisher') && wk.state === 'working'
+                ? 'rod'
+                : null;
       items.push({
         depth: wk.pos.x + wk.pos.y,
         draw: () =>
@@ -401,6 +413,18 @@ export class Renderer {
     for (const wolf of w.wolves) {
       const s = toScreen(wolf.pos.x, wolf.pos.y);
       if (visible(s.x, s.y)) items.push({ depth: wolf.pos.x + wolf.pos.y, draw: () => drawWolf(ctx, s.x, s.y, wolf, time) });
+    }
+    for (const d of w.deer) {
+      const s = toScreen(d.pos.x, d.pos.y);
+      if (visible(s.x, s.y)) items.push({ depth: d.pos.x + d.pos.y, draw: () => drawDeer(ctx, s.x, s.y, d, time) });
+    }
+    // Frostline Camp is safe: the sled by the south gate leads to a new refuge.
+    if (w.worldId === 1 && w.worldDone) {
+      const ss = toScreen(SPOTS.sled.x, SPOTS.sled.y);
+      if (visible(ss.x, ss.y)) {
+        drawSledMarker(ctx, ss.x, ss.y, time);
+        items.push({ depth: SPOTS.sled.x + SPOTS.sled.y, draw: () => drawSled(ctx, ss.x, ss.y, 1, time, night) });
+      }
     }
     const cv = w.caravan;
     if (cv) {

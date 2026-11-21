@@ -18,6 +18,8 @@ import { updatePlayer } from './systems/player';
 import { updateKitchen, updateMorale, updateSurvivors } from './systems/settlement';
 import { updateWildlife } from './systems/wildlife';
 import { updateWorkers } from './systems/workers';
+import { updateHunting } from './systems/hunting';
+import { SPOTS } from './world/layout';
 import { createWorld } from './world/createWorld';
 
 const HUD_INTERVAL = 0.12;
@@ -96,6 +98,8 @@ export class Game {
   private saveTimer = AUTOSAVE_EVERY;
   private prevCoins = 0;
   private hiddenAt = 0;
+  private sledArmed = false;
+  private sledT = 0;
   private hapticCount = new Map<Sfx, number>();
   private listeners = new Set<() => void>();
   private resizeObserver: ResizeObserver;
@@ -227,6 +231,54 @@ export class Game {
     this.publish();
   }
 
+  /** "Find a new refuge": leave this camp for good and start fresh in the next world. */
+  travel(): void {
+    const w = createWorld(Date.now() % 100000, 2);
+    startProgression(w);
+    this.world = w;
+    this.prevCoins = 0;
+    this.welcome = null;
+    this.sledArmed = false;
+    this.renderer.snapCamera(w);
+    this.input.clear();
+    this.persist();
+    audio.play('levelup');
+    haptic('success');
+    this.mode = 'playing';
+    this.publish();
+  }
+
+  /** "Stay here": keep playing this camp; the sled by the gate brings the choice back. */
+  stayHere(): void {
+    this.world.refugeOffer = false;
+    this.sledArmed = false;
+    this.input.clear();
+    this.persist();
+    this.publish();
+  }
+
+  /** Standing still on the sled by the south gate re-opens the refuge card. */
+  private updateSled(dt: number): void {
+    const w = this.world;
+    if (w.worldId !== 1 || !w.worldDone || w.refugeOffer) return;
+    const p = w.player;
+    const d = Math.hypot(p.pos.x - SPOTS.sled.x, p.pos.y - SPOTS.sled.y);
+    if (d > 1.5) {
+      this.sledArmed = true;
+      this.sledT = 0;
+      return;
+    }
+    const slow = Math.hypot(p.vel.x, p.vel.y) < 0.6;
+    this.sledT = d < 0.9 && slow && this.sledArmed ? this.sledT + dt : 0;
+    if (this.sledT > 0.35) {
+      this.sledT = 0;
+      this.sledArmed = false;
+      w.refugeOffer = true;
+      this.input.clear();
+      w.sfx.push('mission');
+    }
+  }
+
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): void {
     setSetting(key, value);
     audio.applySettings();
@@ -292,7 +344,7 @@ export class Game {
   private frame = (now: number) => {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
-    const running = this.mode === 'playing' && !this.world.gameOver;
+    const running = this.mode === 'playing' && !this.world.gameOver && !this.world.refugeOffer;
     // A tap on a building shows what it is; a tap on empty ground closes it.
     const tap = this.input.takeTap();
     if (tap && this.mode === 'playing') {
@@ -341,6 +393,8 @@ export class Game {
     updateWorkers(w, dt);
     updateSurvivors(w, dt);
     updateDefense(w, dt);
+    updateHunting(w, dt);
+    this.updateSled(dt);
     updateWildlife(w, dt);
     updateEvents(w, dt);
     updateMorale(w, dt);

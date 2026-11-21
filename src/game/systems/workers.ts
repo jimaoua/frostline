@@ -2,7 +2,7 @@ import { surplus } from './padcost';
 import { FIRE_WARM_RADIUS, SELL_PRICE } from '../core/constants';
 import { dist } from '../core/math';
 import type { Carryable, NodeKind, ResourceNode, Vec, Worker, World } from '../core/types';
-import { SPOTS } from '../world/layout';
+import { MEADOWS, SPOTS } from '../world/layout';
 import { addFlyer, ring, stackTopZ } from './effects';
 import { hitNode } from './interact';
 import { iceSplash } from './lake';
@@ -10,7 +10,6 @@ import { brake, followRoute, updateMotion } from './motion';
 import { fishPace, lumberPace } from './levels';
 import { planRoute } from './routing';
 
-const FISHER_SPOT: Vec = { x: 17.6, y: 20.35 };
 
 /** Morale scales how briskly the camp works (0.75x … 1.2x). */
 export const moraleFactor = (w: World) => 0.75 + (w.morale / 100) * 0.45;
@@ -97,7 +96,7 @@ function chooseTask(w: World, wk: Worker, dt: number): void {
       return;
     }
     case 'fisher':
-      goTo(w, wk, FISHER_SPOT);
+      goTo(w, wk, SPOTS.fisherSpot);
       wk.state = 'toNode';
       return;
     case 'porter':
@@ -177,15 +176,17 @@ function updateWorker(w: World, wk: Worker, dt: number): void {
     case 'working': {
       brake(wk, dt);
       if (wk.role === 'fisher') {
-        wk.lookAt = w.structures.fishPond.pos;
+        // Pine Valley: the hunter watches the meadow from a hide instead of a hole in the ice.
+        const from = w.worldId === 2 ? MEADOWS[0] : w.structures.fishPond.pos;
+        wk.lookAt = from;
         wk.workT -= dt * pace * fishPace(w);
         if (wk.workT > 0) break;
         wk.workT = 1.5;
         wk.swing = 1;
         wk.carry.push('fish');
         w.stats.fishCaught++;
-        ring(w, w.structures.fishPond.pos, 0.45, '#bfe3ff', 0.3);
-        addFlyer(w, 'fish', w.structures.fishPond.pos, 4, () => wk.pos, stackTopZ(wk.carry.length), 0.36, 36);
+        ring(w, from, 0.45, w.worldId === 2 ? '#e9d3b0' : '#bfe3ff', 0.3);
+        addFlyer(w, 'fish', from, 4, () => wk.pos, stackTopZ(wk.carry.length), 0.36, 36);
         if (wk.carry.length >= wk.capacity) {
           goTo(w, wk, { x: w.structures.grill.pos.x - 0.75, y: w.structures.grill.pos.y + 0.4 });
           wk.state = 'toDrop';

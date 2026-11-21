@@ -7,8 +7,16 @@ type Ctx = CanvasRenderingContext2D;
 export const ITEM_STEP = 4.4;
 export const CASH_STEP = 3.4;
 
+/** Pine Valley draws the kitchen items as meat and roast skewers. */
+let valley = false;
+export function setItemSkin(world: 1 | 2): void {
+  valley = world === 2;
+}
+
 /** Draw one carried / flying item centred at (x, y), lit from the upper-left. */
 export function drawItem(ctx: Ctx, kind: ItemKind, x: number, y: number, s = 1): void {
+  if (valley && kind === 'fish') return drawMeat(ctx, x, y, s);
+  if (valley && kind === 'meal') return drawSkewer(ctx, x, y, s);
   switch (kind) {
     case 'wood': {
       fillRR(ctx, x - 7.5 * s, y - 2.8 * s, 15 * s, 5.6 * s, 2.6 * s, vGrad(ctx, y - 2.8 * s, y + 2.8 * s, '#e0a067', '#93552c'), C.woodDeep, 0.7 * s);
@@ -163,4 +171,48 @@ export function drawStack(ctx: Ctx, items: readonly ItemKind[], x: number, baseY
     const k = i / Math.max(1, items.length);
     drawItem(ctx, items[i], x + sway * k * k * 6, baseY - i * step * squash);
   }
+}
+
+/** Raw venison: a red cut with a marbled fat edge and a bone end. */
+function drawMeat(ctx: Ctx, x: number, y: number, s: number): void {
+  ctx.beginPath();
+  ctx.ellipse(x - 0.6 * s, y, 6.2 * s, 3.1 * s, -0.08, 0, Math.PI * 2);
+  ctx.fillStyle = vGrad(ctx, y - 3 * s, y + 3 * s, '#e8796c', '#a8352f');
+  ctx.fill();
+  ctx.strokeStyle = '#6e1f1c';
+  ctx.lineWidth = 0.6 * s;
+  ctx.stroke();
+  // Fat rim and marbling.
+  ctx.strokeStyle = '#f7e3d2';
+  ctx.lineWidth = 1 * s;
+  ctx.beginPath();
+  ctx.ellipse(x - 0.6 * s, y, 5.2 * s, 2.3 * s, -0.08, Math.PI * 0.9, Math.PI * 1.7);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,220,210,0.55)';
+  ctx.lineWidth = 0.5 * s;
+  ctx.beginPath();
+  ctx.moveTo(x - 3 * s, y + 0.6 * s);
+  ctx.quadraticCurveTo(x - 0.5 * s, y - 0.8 * s, x + 2 * s, y + 0.8 * s);
+  ctx.stroke();
+  // Bone.
+  fillRR(ctx, x + 4.6 * s, y - 0.9 * s, 4 * s, 1.8 * s, 0.9 * s, '#f4ecdc', '#b9a98c', 0.5 * s);
+  ellipse(ctx, x + 8.6 * s, y - 0.9 * s, 1.2 * s, 1.1 * s, '#f4ecdc');
+  ellipse(ctx, x + 8.6 * s, y + 0.9 * s, 1.2 * s, 1.1 * s, '#f4ecdc');
+}
+
+/** Roast skewer: chunks of browned meat on a stick. */
+function drawSkewer(ctx: Ctx, x: number, y: number, s: number): void {
+  ctx.strokeStyle = '#8d5330';
+  ctx.lineWidth = 1.1 * s;
+  ctx.beginPath();
+  ctx.moveTo(x - 9.5 * s, y + 0.6 * s);
+  ctx.lineTo(x + 9.5 * s, y - 0.6 * s);
+  ctx.stroke();
+  const chunks = [-5.2, -1.6, 2, 5.6];
+  chunks.forEach((dx, i) => {
+    const cx = x + dx * s;
+    const cy = y - dx * 0.06 * s;
+    fillRR(ctx, cx - 1.8 * s, cy - 2.6 * s, 3.6 * s, 5.2 * s, 1.4 * s, vGrad(ctx, cy - 2.6 * s, cy + 2.6 * s, i % 2 ? '#c9773a' : '#b0602c', '#6e3418'), '#4f240f', 0.5 * s);
+    ellipse(ctx, cx - 0.5 * s, cy - 1.4 * s, 0.9 * s, 0.5 * s, 'rgba(255,220,150,0.6)');
+  });
 }

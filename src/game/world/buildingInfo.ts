@@ -26,3 +26,15 @@ export const BUILDING_INFO: Record<StructureId, { title: string; text: string }>
   mineLodge: { title: "Miners' Lodge", text: 'Lights the cave. Mine gold and diamonds there for the higher upgrade levels.' },
   lakeCamp: { title: "Ice Fishers' Hut", text: 'Ice fishers catch salmon at the holes in the frozen lake.' },
 };
+
+/** Pine Valley names for the buildings that look different there. */
+const VALLEY_INFO: Partial<Record<StructureId, { title: string; text: string }>> = {
+  campfire: { title: 'Lodge Hearth', text: 'The heart of the lodge. Keep it fed with logs or the cold wins.' },
+  grill: { title: 'Spit Grill', text: 'Hand raw meat over at the glowing spot. It roasts into hot skewers.' },
+  counter: { title: 'Serving Counter', text: 'Put skewers out here. Hungry hunters pay at the counter.' },
+  fishShack: { title: "Hunter's Hut", text: 'A hunter and a cook live here. The hunter brings in deer; the cook runs the spit.' },
+};
+
+export function buildingInfo(world: 1 | 2, id: StructureId): { title: string; text: string } {
+  return (world === 2 && VALLEY_INFO[id]) || BUILDING_INFO[id];
+}

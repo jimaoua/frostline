@@ -268,6 +268,20 @@ export interface Footprint {
   big: boolean;
 }
 
+export interface Deer {
+  id: number;
+  pos: Vec;
+  vel: Vec;
+  facing: number;
+  hp: number;
+  state: 'graze' | 'flee' | 'tired' | 'dead';
+  /** Seconds left in the current state (flee sprint, tired pause, corpse fade). */
+  t: number;
+  /** The meadow it lives in. */
+  home: Vec;
+  hurtT: number;
+}
+
 export interface PadPart {
   kind: ItemKind;
   amount: number;
@@ -362,6 +376,7 @@ export interface Stats {
   coinsEarned: number;
   wolvesKilled: number;
   oreSold: number;
+  deerHunted: number;
   goldMined: number;
   diamondsMined: number;
   scoutsFound: number;
@@ -384,6 +399,8 @@ export interface Flags {
   /** Chapter 8: the Miners' Lodge lights the cave; gold and diamonds can be mined. */
   cave: boolean;
   harvestWood: boolean;
+  /** Pine Valley: deer roam the meadows and can be hunted. */
+  hunting: boolean;
   harvestStone: boolean;
   harvestOre: boolean;
   fishing: boolean;
@@ -468,6 +485,15 @@ export interface World {
   kitchen: Kitchen;
   coins: number;
   coinPile: number;
+  /** Which level (map) this is: 1 = the Frozen Camp, 2 = Pine Valley. */
+  worldId: 1 | 2;
+  /** World 1 is finished: the travel card was shown once on its own. */
+  /** The refuge is safe: the last chapter of this world was reached. */
+  worldDone: boolean;
+  /** The "find a new refuge or stay" card is showing. */
+  refugeOffer: boolean;
+  /** Pine Valley deer. */
+  deer: Deer[];
   /** Items the player left in the stash (never money). */
   stash: Partial<Record<Carryable, number>>;
   /** Building the player tapped, shown in the info card for a few seconds. */

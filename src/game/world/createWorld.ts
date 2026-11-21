@@ -5,6 +5,7 @@ import { makeMover } from '../systems/motion';
 import { BaseLayout } from './base';
 import { SPOTS, generateNodes } from './layout';
 import { campXpFor } from '../systems/levels';
+import { activateWorld, type WorldId } from './worlds';
 
 function structure(id: StructureId, pos: Vec, radius: number, built = false): Structure {
   return { id, pos: { ...pos }, radius, built, builtAt: -10, bumpAt: -10 };
@@ -44,6 +45,7 @@ export const emptyStats = (): Stats => ({
   coinsEarned: 0,
   wolvesKilled: 0,
   oreSold: 0,
+  deerHunted: 0,
   goldMined: 0,
   diamondsMined: 0,
   scoutsFound: 0,
@@ -58,7 +60,8 @@ export const emptyStats = (): Stats => ({
   smokedSold: 0,
 });
 
-export function createWorld(seed = 7): World {
+export function createWorld(seed = 7, worldId: WorldId = 1): World {
+  activateWorld(worldId);
   const rng = mulberry32(seed);
   const player: Player = {
     ...makeMover(SPOTS.playerStart, PLAYER_SPEED),
@@ -88,7 +91,7 @@ export function createWorld(seed = 7): World {
     workers: [],
     survivors: [],
     wolves: [],
-    nodes: generateNodes(rng),
+    nodes: generateNodes(rng, worldId),
     structures: {
       campfire: structure('campfire', S.campfire, 0.55, true),
       fishPond: structure('fishPond', S.fishPond, 0),
@@ -158,6 +161,10 @@ export function createWorld(seed = 7): World {
     coinPile: 0,
     stash: {},
     info: null,
+    worldId,
+    worldDone: false,
+    refugeOffer: false,
+    deer: [],
     smoke: { raw: 0, slots: Array(SMOKE_SLOTS).fill(-1), ready: 0 },
     marketCash: 0,
     fire: { lit: false, fuel: 0, litAt: -10 },
@@ -166,6 +173,7 @@ export function createWorld(seed = 7): World {
     flags: {
       lake: false,
       caveFound: false,
+      hunting: false,
       cave: false,
       harvestWood: false,
       harvestStone: false,
@@ -209,6 +217,7 @@ export function createWorld(seed = 7): World {
     flash: 0,
   };
   applyBuildCosts(w);
+  if (worldId === 2) applyValleyNames(w);
   return w;
 }
 
@@ -258,4 +267,14 @@ function applyBuildCosts(w: World): void {
     w.pads[id].cost = c.cost;
     w.pads[id].parts = c.parts;
   }
+}
+
+/** Pine Valley names for the kitchen pads (the engine underneath is the same). */
+function applyValleyNames(w: World): void {
+  w.pads.grill.label = 'Spit Grill';
+  w.pads.fishShack.label = "Hunter's Hut";
+  w.pads.fishShack.icon = 'arrow';
+  w.pads.upGrill.label = 'Bigger Spit';
+  w.pads.upFishing.label = 'Better Bows';
+  w.pads.upFishing.icon = 'arrow';
 }

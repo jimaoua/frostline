@@ -23,8 +23,9 @@ export function Hud({ game }: { game: Game }) {
       </div>
     );
   }
+  itemName = hud.world === 2 ? { ...ITEM_NAME, ...VALLEY_ITEM_NAME } : ITEM_NAME;
   return (
-    <div className="hud">
+    <div className={`hud ${hud.world === 2 ? 'hud--w2' : ''}`}>
       <div className="hud__top">
         <div className="hud__col">
           {hud.camp && <CampLevel c={hud.camp} />}
@@ -64,6 +65,7 @@ export function Hud({ game }: { game: Game }) {
       )}
       {app.mode === 'paused' && <PauseMenu game={game} app={app} />}
       {app.mode === 'welcome' && app.welcome && <WelcomeBack game={game} app={app} />}
+      {hud.refuge && app.mode === 'playing' && <RefugeCard game={game} />}
       {hud.gameOver && (
         <div className="gameover">
           <div className="gameover__card">
@@ -218,7 +220,7 @@ function StorageButtons({ s }: { s: NonNullable<HudSnapshot['storage']> }) {
           {s.stash.map((x) => (
             <div className="storerow" key={x.kind}>
               <i className={`ico ico--${x.kind}`} />
-              <span>{ITEM_NAME[x.kind]}</span>
+              <span>{itemName[x.kind]}</span>
               <b>{x.n}</b>
             </div>
           ))}
@@ -239,6 +241,53 @@ function StorageButtons({ s }: { s: NonNullable<HudSnapshot['storage']> }) {
     </div>
   );
 }
+
+/**
+ * The end of Frostline Camp: the camp is safe. Set out for a new refuge
+ * (fresh start, no way back) or stay; the sled by the south gate brings this
+ * card back.
+ */
+function RefugeCard({ game }: { game: Game }) {
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <div className="gameover refuge" onPointerDown={stopPointer}>
+      <div className="gameover__card refuge__card">
+        {!confirm ? (
+          <>
+            <div className="refuge__badge" />
+            <h2>The camp is safe</h2>
+            <p>Frostline Camp and its people will make it through the winter. Discover a new refuge, or stay here and keep building.</p>
+            <div className="refuge__btns">
+              <button type="button" onClick={() => setConfirm(true)}>
+                Find a new refuge
+              </button>
+              <button type="button" className="refuge__stay" onClick={() => game.stayHere()}>
+                Stay here
+              </button>
+            </div>
+            <small>Changed your mind later? The sled by the south gate is waiting.</small>
+          </>
+        ) : (
+          <>
+            <h2>Set out for Pine Valley?</h2>
+            <p>A hunting lodge deep in the pines. You start fresh: new map, new missions, empty pockets. There is no way back to this camp.</p>
+            <div className="refuge__btns">
+              <button type="button" onClick={() => game.travel()}>
+                Yes, set out
+              </button>
+              <button type="button" className="refuge__stay" onClick={() => setConfirm(false)}>
+                Not yet
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const VALLEY_ITEM_NAME: Record<string, string> = { fish: 'Meat', meal: 'Skewers' };
+let itemName: Record<string, string> = {};
 
 const ITEM_NAME: Record<string, string> = {
   wood: 'Logs',

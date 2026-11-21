@@ -467,13 +467,16 @@ export function drawLumberHut(ctx: Ctx, sx: number, sy: number, time: number, bu
   });
 }
 
-export function drawFishShack(ctx: Ctx, sx: number, sy: number, time: number, builtAt: number, night: number): void {
+export function drawFishShack(ctx: Ctx, sx: number, sy: number, time: number, builtAt: number, night: number, valley = false): void {
   withBuild(ctx, builtAt, time, 46, 0.7, sx, sy, () => {
     softShadow(ctx, 4, 4, 46, 20, 0.3);
     const W = 1.2;
     const D = 1.0;
-    prism(ctx, 0, 0, W, D, 26, 0, { left: vGrad(ctx, -26, 0, '#6aa3c9', '#3f7aa3'), right: vGrad(ctx, -26, 0, '#4f88b0', '#2c5f84') });
-    ctx.strokeStyle = 'rgba(20,50,80,0.35)';
+    // Pine Valley: the same hut in dark logs, as the Hunter's Hut.
+    prism(ctx, 0, 0, W, D, 26, 0, valley
+      ? { left: vGrad(ctx, -26, 0, '#a5714a', '#6e4428'), right: vGrad(ctx, -26, 0, '#8a5a38', '#553320') }
+      : { left: vGrad(ctx, -26, 0, '#6aa3c9', '#3f7aa3'), right: vGrad(ctx, -26, 0, '#4f88b0', '#2c5f84') });
+    ctx.strokeStyle = valley ? 'rgba(50,25,10,0.4)' : 'rgba(20,50,80,0.35)';
     for (let i = 1; i < 6; i++) {
       const a = rel(-W / 2 + (W / 6) * i, D / 2, 0);
       ctx.beginPath();
@@ -483,8 +486,23 @@ export function drawFishShack(ctx: Ctx, sx: number, sy: number, time: number, bu
     }
     poly(ctx, [rel(-0.2, D / 2, 0), rel(0.2, D / 2, 0), rel(0.2, D / 2, 19), rel(-0.2, D / 2, 19)], '#2a3f55');
     windowOn(ctx, [rel(W / 2, -0.3, 11), rel(W / 2, 0.1, 11), rel(W / 2, 0.1, 19), rel(W / 2, -0.3, 19)], night);
-    gableRoof(ctx, 0, 0, W, D, 25, 44, 0.14, { front: '#e9e2d6', back: '#b8ad9c', gable: '#4f88b0', snow: '#f7fbff' });
-    // Fish drying rack.
+    gableRoof(ctx, 0, 0, W, D, 25, 44, 0.14, { front: '#e9e2d6', back: '#b8ad9c', gable: valley ? '#3d6b4a' : '#4f88b0', snow: '#f7fbff' });
+    if (valley) {
+      // Antlers over the door.
+      const a = rel(0, D / 2, 24);
+      ctx.strokeStyle = '#efe2c8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (const k of [-1, 1]) {
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(a.x + k * 6, a.y - 7);
+        ctx.lineTo(a.x + k * 9, a.y - 6);
+        ctx.moveTo(a.x + k * 3.5, a.y - 4);
+        ctx.lineTo(a.x + k * 3, a.y - 9);
+      }
+      ctx.stroke();
+    }
+    // Drying rack (fish, or cuts of meat in Pine Valley).
     const r0 = rel(-W / 2 - 0.25, D / 2 + 0.2);
     ctx.strokeStyle = C.woodDark;
     ctx.lineWidth = 1.6;

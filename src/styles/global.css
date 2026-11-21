@@ -1156,3 +1156,75 @@ button.install {
   border-radius: 0;
   height: 15px;
 }
+
+/* ---------- Pine Valley ---------- */
+
+.hud--w2 .ico--fish {
+  background: radial-gradient(circle at 70% 45%, #f6e6d6 0 14%, transparent 16%), linear-gradient(120deg, #b5443c, #e0766a);
+  border-radius: 55% 45% 50% 40%;
+  height: 11px;
+}
+
+.hud--w2 .ico--meal {
+  background: linear-gradient(90deg, transparent 0 8%, #c98a4a 8% 30%, #8d4a2a 30% 52%, #c98a4a 52% 74%, transparent 74%),
+    linear-gradient(transparent 44%, #e8d6b8 44% 56%, transparent 56%);
+  border-radius: 4px;
+  height: 12px;
+}
+
+.refuge {
+  z-index: 30;
+  animation: refuge-in 0.35s ease-out;
+}
+
+.refuge__card {
+  width: min(88vw, 340px);
+  background: linear-gradient(180deg, rgba(30, 48, 70, 0.97), rgba(20, 32, 50, 0.97));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), inset 0 0 0 2px rgba(255, 211, 77, 0.25);
+}
+
+.refuge__badge {
+  width: 56px;
+  height: 56px;
+  margin: -4px auto 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, #ffd34d 0 22%, #ff9a2e 24% 34%, transparent 36%),
+    radial-gradient(circle, #3b5a7a 0 64%, #ffd34d 66% 70%, transparent 72%);
+  animation: refuge-glow 1.6s ease-in-out infinite alternate;
+}
+
+.refuge__btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.refuge__btns button {
+  width: 100%;
+}
+
+.gameover__card .refuge__stay {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.refuge__card small {
+  display: block;
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+@keyframes refuge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes refuge-glow {
+  to {
+    transform: scale(1.06);
+    filter: brightness(1.15);
+  }
+}

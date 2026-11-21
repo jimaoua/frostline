@@ -1,5 +1,5 @@
 import type { Carryable, ItemKind, Pad, World } from './core/types';
-import { BUILDING_INFO } from './world/buildingInfo';
+import { buildingInfo } from './world/buildingInfo';
 import { stashCapacity } from './systems/levels';
 import { isMulti } from './systems/padcost';
 import { currentObjective } from './progression/phases';
@@ -36,6 +36,10 @@ export interface HudSnapshot {
   toast?: { id: number; kind: 'mission' | 'level'; title: string; sub: string };
   dragHint: boolean;
   gameOver: boolean;
+  /** Which refuge this is (1 Frostline Camp, 2 Pine Valley). */
+  world: 1 | 2;
+  /** The "camp is safe: find a new refuge or stay" card is up. */
+  refuge: boolean;
 }
 
 export function buildHud(w: World): HudSnapshot {
@@ -58,7 +62,7 @@ export function buildHud(w: World): HudSnapshot {
       : undefined,
     resources: w.flags.showResources ? { coins: Math.floor(w.coins), carry: carried(w) } : undefined,
     storage: w.flags.showResources ? storage(w) : undefined,
-    info: w.info && w.time - w.info.at < INFO_SECONDS ? { id: w.info.id, ...BUILDING_INFO[w.info.id] } : undefined,
+    info: w.info && w.time - w.info.at < INFO_SECONDS ? { id: w.info.id, ...buildingInfo(w.worldId, w.info.id) } : undefined,
     morale: w.flags.showMorale ? { value: Math.round(w.morale), residents: residents(w) } : undefined,
     defense: w.defense.visible
       ? {
@@ -83,6 +87,8 @@ export function buildHud(w: World): HudSnapshot {
     toast: w.toast && w.time - w.toast.at < 2.4 ? { id: w.toast.id, kind: w.toast.kind, title: w.toast.title, sub: w.toast.sub } : undefined,
     dragHint: w.phase === 1 && w.tutorial.moved < 1.5,
     gameOver: w.gameOver,
+    world: w.worldId,
+    refuge: w.refugeOffer && !w.gameOver,
   };
 }
 

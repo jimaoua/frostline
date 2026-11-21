@@ -59,7 +59,8 @@ export function loadWorld(): LoadedSave | null {
     const file = JSON.parse(raw) as SaveFile;
     if (file.version !== VERSION || !file.world) return null;
     // Start from a fresh world (generator, layout, empty effects), then lay the saved state over it.
-    const w = createWorld(Date.now() % 100000);
+    const id = (file.world as Partial<World>).worldId === 2 ? 2 : 1;
+    const w = createWorld(Date.now() % 100000, id);
     // Lay the save over the fresh world. Records (structures, pads, stats,
     // levels, flags, stock…) are merged so content added in later versions
     // (e.g. Chapter 2 buildings) is present in old saves too.

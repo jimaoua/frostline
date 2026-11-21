@@ -7,7 +7,7 @@ import { popup } from '../systems/effects';
 import { clearWestYard } from '../systems/lake';
 import { spawnStranded } from '../systems/settlement';
 import { isMulti, padParts, padRatio } from '../systems/padcost';
-import { CAVE, CAVE_MOUTH, SPOTS } from '../world/layout';
+import { CAVE, CAVE_MOUTH, MEADOWS, SPOTS } from '../world/layout';
 import { revealCave } from '../systems/cave';
 
 /**
@@ -106,6 +106,7 @@ function kitchenTarget(w: World): Vec {
   const k = w.kitchen;
   if (carrying(w, 'meal') > 0) return SPOTS.counterServe;
   if (carrying(w, 'fish') > 0 || k.tray > 0) return SPOTS.grillZone;
+  if (w.worldId === 2) return nearestDeer(w) ?? MEADOWS[0];
   return SPOTS.fishSpot;
 }
 
@@ -174,7 +175,7 @@ const countStep = (
   done: (w) => since(w, key) >= total,
 });
 
-export const PHASES: PhaseDef[] = [
+const FROST_PHASES: PhaseDef[] = [
   {
     id: 1,
     title: 'First Light',
@@ -440,6 +441,100 @@ export const PHASES: PhaseDef[] = [
   },
 ];
 
+/** Pine Valley: the nearest deer still standing. */
+function nearestDeer(w: World): Vec | null {
+  let best: Vec | null = null;
+  let bd = Infinity;
+  for (const d of w.deer) {
+    if (d.state === 'dead') continue;
+    const dd = dist(d.pos, w.player.pos);
+    if (dd < bd) {
+      bd = dd;
+      best = d.pos;
+    }
+  }
+  return best;
+}
+
+const frostStep = (id: string): StepDef => {
+  for (const ph of FROST_PHASES) for (const st of ph.steps) if (st.id === id) return st;
+  throw new Error(`no step ${id}`);
+};
+
+/**
+ * Pine Valley (World 2), first delivery: arrival and the hunt. The kitchen
+ * runs on meat (the fish pipeline, re-skinned); later chapters (river,
+ * smokehouse, tannery, bears, stew) follow in the next updates.
+ */
+const VALLEY_PHASES: PhaseDef[] = [
+  {
+    id: 1,
+    title: 'Arrival',
+    enter: (w) => {
+      w.flags.harvestWood = true;
+      w.flags.fireAcceptsWood = true;
+    },
+    steps: [
+      { ...frostStep('chop'), text: () => 'Clear a path: chop a tree' },
+      { ...frostStep('ignite'), text: () => `Bring ${FIRE_WOOD_REQUIRED} logs and light the hearth` },
+    ],
+  },
+  {
+    id: 2,
+    title: 'The Hunt',
+    enter: (w) => {
+      w.flags.fireAcceptsWood = false;
+      w.flags.hunting = true;
+    },
+    steps: [
+      { ...frostStep('rescue'), text: () => 'A trapper is lost in the woods! Lead them to the fire' },
+      {
+        id: 'tracks',
+        text: () => 'Follow the deer tracks to the meadow',
+        hint: 'Out through the south gate. Deer graze in the open snow.',
+        target: () => MEADOWS[0],
+        done: (w) => dist(w.player.pos, MEADOWS[0]) < 3.2,
+      },
+      countStep('hunt', 'Bring down a deer', 'deerHunted', 1, 'Run it down. Deer sprint, then tire: catch them and swing.', undefined, (w) => nearestDeer(w)),
+      padStep('grill', 'Build a spit grill with logs', 'Chop trees in the valley and carry the logs to the pad.', undefined, (w) =>
+        carrying(w, 'wood') === 0 && w.stock.wood > 0 ? w.structures.woodpile.pos : carrying(w, 'wood') === 0 ? nearestTree(w) : null,
+      ),
+      countStep('cook', 'Roast your first meat', 'mealsCooked', 1, 'Hand the meat over at the glowing spot. It roasts by itself.', undefined, (w) =>
+        carrying(w, 'fish') > 0 || w.kitchen.raw > 0 ? SPOTS.grillZone : (nearestDeer(w) ?? MEADOWS[0]),
+      ),
+      { ...frostStep('serve'), text: () => 'Feed the hungry hunters', hint: 'Meat → spit → counter. Hunters pay cash.' },
+      frostStep('cash'),
+      { ...frostStep('upGrill'), text: () => 'Make the spit grill bigger (Lv 2)' },
+      {
+        ...frostStep('fishShack'),
+        text: () => "Build the Hunter's Hut to automate the kitchen",
+        hint: 'A hunter brings in deer and a cook runs the spit.',
+      },
+    ],
+  },
+  {
+    id: 3,
+    title: 'The Valley Lodge',
+    enter: (w) => {
+      w.flags.showResources = true;
+    },
+    steps: [
+      {
+        id: 'endless',
+        text: (w) => `Keep the lodge running · Day ${w.day.day}`,
+        hint: 'More of Pine Valley is on its way: the river, the smokehouse and the tannery.',
+        done: () => false,
+      },
+    ],
+  },
+];
+
+/** The active world's missions (swapped in place when the world changes). */
+export const PHASES: PhaseDef[] = [...FROST_PHASES];
+export function usePhases(worldId: 1 | 2): void {
+  PHASES.splice(0, PHASES.length, ...(worldId === 2 ? VALLEY_PHASES : FROST_PHASES));
+}
+
 /** The nearest mineable node of a kind (gold or diamond veins in the cave). */
 function nearestNodeOf(w: World, kind: 'gold' | 'diamond'): Vec | null {
   let best: Vec | null = null;
@@ -503,6 +598,11 @@ export function updateProgression(w: World): void {
   const step = phase.steps[w.stepIndex];
   w.guide = step.target?.(w) ?? null;
   w.guideHand = w.phase <= 1 || (w.phase === 2 && w.stepIndex <= 3) || !!step.hand;
+  // The last chapter of Frostline Camp: the camp is safe, offer the next refuge.
+  if (w.worldId === 1 && step.id === 'endless' && !w.worldDone) {
+    w.worldDone = true;
+    w.refugeOffer = true;
+  }
   if (!step.done(w)) return;
   if (step.id !== 'endless') {
     const reward = step.reward ?? 10 + w.phase * 5;

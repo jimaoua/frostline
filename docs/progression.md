@@ -202,3 +202,12 @@ ring at the station the moment you buy it.
 
 Not done in this stage: the planned "tents become cabins". The camp has no
 tents to upgrade, so that needs new dwellings first.
+
+## World 2 — Pine Valley (delivery 1)
+
+- **Worlds.** `world/worlds.ts` `activateWorld(id)` swaps `SPOTS` and `PHASES` in place; `createWorld(seed, worldId)` calls it, and `loadWorld` reads `worldId` from the save first (old saves → World 1). One save slot: travelling overwrites World 1 (forward only, by design).
+- **End of World 1.** Reaching the `endless` step sets `worldDone` and opens the refuge card (*The camp is safe* → *Find a new refuge* → confirm, or *Stay here*). Staying keeps the camp; standing on the sled by the south gate (`SPOTS.sled`) opens the card again. The simulation pauses while the card is up.
+- **Pine Valley map.** Same stockade; denser pine forest, no rocks or ore, a frozen river along x + y ≈ 63 and two meadows (`MEADOWS`).
+- **Hunting** (`systems/hunting.ts`). Up to 4 deer graze in the meadows. Close in and they bolt (3.6 vs your 3.4) for 2.2 s, then tire (1.3) for 1.9 s. Three swings bring one down: +2 meat onto your stack. Meat and skewers run through the fish/meal kitchen (same economy, drawn and named differently).
+- **Missions.** 1 Arrival: chop, light the hearth. 2 The Hunt: rescue the trapper, follow the tracks, bring down a deer, spit grill, roast, feed the hunters, cash, bigger spit, Hunter's Hut (hunter + cook). 3 The Valley Lodge: placeholder endless until delivery 2 (river, smokehouse, tannery).
+- **Checks.** World 1 bot run: 45/45 missions. Pine Valley bot run: chapters 1–2 in about 1 minute of game time, hunter worker delivers meat, save + reload stays in the valley.

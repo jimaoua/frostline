@@ -14,7 +14,7 @@ export interface HumanOpts {
   /** Cash on the back, in dollars. */
   cash?: number;
   swing: number;
-  tool: 'axe' | 'pick' | 'rod' | null;
+  tool: 'axe' | 'pick' | 'rod' | 'bow' | null;
   showToolIdle?: boolean;
   time: number;
   full?: boolean;
@@ -40,7 +40,24 @@ function swingAngle(sw: number): number {
   return 0.35 - ((t - 0.45) / 0.55) * 0.8; // settle
 }
 
-function drawTool(ctx: Ctx, tool: 'axe' | 'pick' | 'rod', tug: number): void {
+function drawTool(ctx: Ctx, tool: 'axe' | 'pick' | 'rod' | 'bow', tug: number): void {
+  if (tool === 'bow') {
+    // Hunting bow held out in front, string drawn back on a shot.
+    ctx.strokeStyle = '#7a4a28';
+    ctx.lineWidth = 1.7;
+    ctx.beginPath();
+    ctx.moveTo(-7, 12);
+    ctx.quadraticCurveTo(0, 22, 7, 12);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(-7, 12);
+    ctx.lineTo(0, 12 - tug * 5);
+    ctx.lineTo(7, 12);
+    ctx.stroke();
+    return;
+  }
   if (tool === 'rod') {
     ctx.strokeStyle = '#6b4429';
     ctx.lineWidth = 1.6;
@@ -228,11 +245,12 @@ export function drawHuman(ctx: Ctx, sx: number, sy: number, m: Mover, s: HumanSt
     const acting = o.swing > 0.01;
     let ang = armSwing;
     if (o.tool === 'rod') ang = -1.9 - (acting ? Math.sin(o.swing * Math.PI) * 0.5 : Math.sin(o.time * 1.5) * 0.05);
+    else if (o.tool === 'bow') ang = -1.55 + Math.sin(o.time * 1.2) * 0.04;
     else if (acting) ang = swingAngle(o.swing);
     ctx.save();
     ctx.translate(1.5 + side * 2, shoulderY);
     ctx.rotate(ang);
-    if (o.tool && (acting || o.showToolIdle || o.tool === 'rod')) drawTool(ctx, o.tool, o.swing);
+    if (o.tool && (acting || o.showToolIdle || o.tool === 'rod' || o.tool === 'bow')) drawTool(ctx, o.tool, o.swing);
     fillRR(ctx, -2.8, -1, 5.6, 11.5, 2.8, lit(ctx, F, -2.8, 2.8, s.coatLight, s.coat, s.coatDark));
     ball(ctx, 0, 11, 3.2, 3.2, s.coatLight, s.coatDark, '#1a2433');
     ctx.restore();
