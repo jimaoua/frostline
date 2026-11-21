@@ -148,3 +148,12 @@ export function stackSquash(w: World): number {
   const t = (w.time - feel(w).stackBumpAt) / 0.14;
   return t >= 1 || t < 0 ? 1 : 1 - Math.sin(t * Math.PI) * 0.1;
 }
+
+/** When each station last went up a level (its new piece pops in then). */
+const levelAts = new WeakMap<World, Partial<Record<string, number>>>();
+export function markLevelUp(w: World, station: string): void {
+  let m = levelAts.get(w);
+  if (!m) levelAts.set(w, (m = {}));
+  m[station] = w.time;
+}
+export const levelUpAt = (w: World, station: string) => levelAts.get(w)?.[station] ?? -10;

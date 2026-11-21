@@ -7,7 +7,7 @@ import { nightAmount, warmRadius } from '../systems/settlement';
 import { windVec } from '../systems/effects';
 import { QUADRANTS, SPOTS } from '../world/layout';
 import { drawHuman, drawWolf } from './characters';
-import { padBumpAt, padShownRatio, padStageAt, stackSquash } from '../systems/feel';
+import { levelUpAt, padBumpAt, padShownRatio, padStageAt, stackSquash } from '../systems/feel';
 import { SITE_STRUCTURES } from '../core/constants';
 import { drawCave } from './cave';
 import { drawStashFloor, drawStationZone, drawExpandZone, drawFireRing, drawPad, drawPadBadge, drawWarmZone } from './floor';
@@ -179,7 +179,7 @@ export class Renderer {
     const S = w.structures;
     if (S.fishPond.built) {
       const s = toScreen(S.fishPond.pos.x, S.fishPond.pos.y);
-      drawFishPond(ctx, s.x, s.y, time);
+      drawFishPond(ctx, s.x, s.y, time, w.levels.fishing, levelUpAt(w, 'fishing'));
     }
     drawFootprints(ctx, w, view);
 
@@ -278,14 +278,14 @@ export class Renderer {
           draw = () => drawCampfire(ctx, w, s.x, s.y, time);
           break;
         case 'grill':
-          draw = () => drawGrill(ctx, w.kitchen, st.bumpAt, s.x, s.y, time, b);
+          draw = () => drawGrill(ctx, w.kitchen, st.bumpAt, s.x, s.y, time, b, w.levels.grill, levelUpAt(w, 'grill'));
           break;
         case 'counter':
-          draw = () => drawCounter(ctx, w.kitchen.counter, st.bumpAt, s.x, s.y, time, b, night);
+          draw = () => drawCounter(ctx, w.kitchen.counter, st.bumpAt, s.x, s.y, time, b, night, w.levels.hatch, levelUpAt(w, 'hatch'));
           dd = -0.3;
           break;
         case 'lumberHut':
-          draw = () => drawLumberHut(ctx, s.x, s.y, time, b, night);
+          draw = () => drawLumberHut(ctx, s.x, s.y, time, b, night, w.levels.lumber, levelUpAt(w, 'lumber'));
           dd = 0.4;
           break;
         case 'fishShack':
@@ -315,11 +315,11 @@ export class Renderer {
           draw = () => drawPile(ctx, 'stone', w.stock.stone, s.x, s.y, st.bumpAt, time);
           break;
         case 'stash':
-          draw = () => drawStashPiles(ctx, w.stash, st.bumpAt, s.x, s.y, time);
+          draw = () => drawStashPiles(ctx, w.stash, st.bumpAt, s.x, s.y, time, w.levels.stash, levelUpAt(w, 'stash'));
           dd = -0.3;
           break;
         case 'smokehouse':
-          draw = () => drawSmokehouse(ctx, w.smoke, st.bumpAt, s.x, s.y, time, b, night);
+          draw = () => drawSmokehouse(ctx, w.smoke, st.bumpAt, s.x, s.y, time, b, night, w.levels.smoke, levelUpAt(w, 'smoke'));
           dd = 0.4;
           break;
         case 'market':

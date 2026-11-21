@@ -1,6 +1,7 @@
 import { COOK_TIME, FISH_INTERVAL, MEAL_PRICE, SMOKE_TIME } from '../core/constants';
-import type { Pad, PadPart, StationId, Vec, World } from '../core/types';
-import { burst, celebrate, popup, sfx } from './effects';
+import type { Pad, PadPart, StationId, StructureId, Vec, World } from '../core/types';
+import { markLevelUp } from './feel';
+import { burst, celebrate, popup, ring, sfx } from './effects';
 
 /**
  * Two small loops that keep players coming back for "one more":
@@ -11,6 +12,16 @@ import { burst, celebrate, popup, sfx } from './effects';
  */
 
 export const STATION_MAX = 4;
+
+/** The building that shows each station's level. */
+const STATION_STRUCTURE: Record<StationId, StructureId> = {
+  grill: 'grill',
+  hatch: 'counter',
+  fishing: 'fishPond',
+  lumber: 'lumberHut',
+  smoke: 'smokehouse',
+  stash: 'stash',
+};
 
 /** Cost multiplier for each further station level. */
 const LEVEL_COST_GROWTH = 2.1;
@@ -75,6 +86,15 @@ export function completeLevelPad(w: World, pad: Pad, station: StationId): void {
   w.levels[station]++;
   const lv = w.levels[station];
   celebrate(w, pad.pos, `${STATION_LABEL[station]} Lv ${lv}!`);
+  // The station itself shows the new level: its new piece pops in with dust and sparkles.
+  const st = w.structures[STATION_STRUCTURE[station]];
+  if (st) {
+    st.bumpAt = w.time;
+    markLevelUp(w, station);
+    burst(w, 'puff', st.pos, 8, { color: ['#ffffff', '#e9e1d4'], z: 8, speed: 1.4, up: 26, size: 7, life: 0.6 });
+    burst(w, 'spark', st.pos, 10, { color: ['#ffe58a', '#ffffff'], z: 30, speed: 1.5, up: 120, size: 2, life: 0.7 });
+    ring(w, st.pos, 1.1, '#ffe58a', 0.45);
+  }
   sfx(w, 'upgrade');
   popup(w, pad.pos, 80, STATION_PERK[station], '#ffe8a3');
   addXp(w, 15, pad.pos);

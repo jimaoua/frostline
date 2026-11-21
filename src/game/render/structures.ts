@@ -5,6 +5,7 @@ import type { Caravan, GateDoor, ItemKind, Kitchen, Pad, Trap, Tower, Vec, World
 import type { GateDef } from '../world/layout';
 import { padShownRatio } from '../systems/feel';
 import { drawItem } from './items';
+import { counterTier, grillBack, grillFront, lumberTier, pondTier, stashBack } from './tiers';
 import { C } from './palette';
 import {
   ball,
@@ -271,7 +272,7 @@ export function drawCampfire(ctx: Ctx, w: World, sx: number, sy: number, time: n
 
 /* ---------------- Kitchen ---------------- */
 
-export function drawFishPond(ctx: Ctx, sx: number, sy: number, time: number): void {
+export function drawFishPond(ctx: Ctx, sx: number, sy: number, time: number, lv = 1, lvAt = -10): void {
   onGround(ctx, sx, sy, () => {
     ctx.beginPath();
     ctx.ellipse(0, 0, 1.08, 0.92, 0.3, 0, Math.PI * 2);
@@ -324,12 +325,14 @@ export function drawFishPond(ctx: Ctx, sx: number, sy: number, time: number): vo
   const b = rel(-0.7, 0.75);
   ball(ctx, sx + b.x + 10, sy + b.y - 6, 4, 3.5, '#ffffff', '#cfe6f6', '#8fb8d6');
   ball(ctx, sx + b.x - 4, sy + b.y - 3, 3, 2.6, '#ffffff', '#cfe6f6', '#8fb8d6');
+  pondTier(ctx, sx, sy, lv, time, lvAt);
 }
 
-export function drawGrill(ctx: Ctx, k: Kitchen, bumpAt: number, sx: number, sy: number, time: number, builtAt: number): void {
+export function drawGrill(ctx: Ctx, k: Kitchen, bumpAt: number, sx: number, sy: number, time: number, builtAt: number, lv = 1, lvAt = -10): void {
   withBuild(ctx, builtAt, time, 26, 0.6, sx, sy, () => {
     ctx.scale(1, bumpScale(bumpAt, time));
     softShadow(ctx, 2, 2, 34, 13, 0.3);
+    grillBack(ctx, lv, time, lvAt);
     prism(ctx, 0, 0, 1.25, 0.75, 16, 0, { left: vGrad(ctx, -20, 0, '#9aa6b4', '#5f6b7b'), right: vGrad(ctx, -20, 0, '#7a8696', '#465060'), top: '#3a2a22' });
     // Stone texture.
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
@@ -351,6 +354,7 @@ export function drawGrill(ctx: Ctx, k: Kitchen, bumpAt: number, sx: number, sy: 
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
     }
+    grillFront(ctx, lv, time, lvAt);
     // Fish cooking on the grate: raw blue → golden.
     k.slots.forEach((p, i) => {
       if (p < 0) return;
@@ -368,7 +372,7 @@ export function drawGrill(ctx: Ctx, k: Kitchen, bumpAt: number, sx: number, sy: 
   });
 }
 
-export function drawCounter(ctx: Ctx, meals: number, bumpAt: number, sx: number, sy: number, time: number, builtAt: number, night: number): void {
+export function drawCounter(ctx: Ctx, meals: number, bumpAt: number, sx: number, sy: number, time: number, builtAt: number, night: number, lv = 1, lvAt = -10): void {
   withBuild(ctx, builtAt, time, 50, 0.6, sx, sy, () => {
     ctx.scale(1, bumpScale(bumpAt, time));
     softShadow(ctx, 0, 2, 30, 12);
@@ -400,6 +404,7 @@ export function drawCounter(ctx: Ctx, meals: number, bumpAt: number, sx: number,
     const s = rel(-0.15, 0.32, 40);
     fillRR(ctx, s.x - 9, s.y - 6, 18, 10, 2, '#5a3420');
     drawItem(ctx, 'meal', s.x, s.y - 1, 0.75);
+    counterTier(ctx, lv, time, lvAt, night);
   });
 }
 
@@ -435,7 +440,7 @@ export function drawCashPad(ctx: Ctx, cash: number, bumpAt: number, sx: number, 
 
 /* ---------------- Buildings ---------------- */
 
-export function drawLumberHut(ctx: Ctx, sx: number, sy: number, time: number, builtAt: number, night: number): void {
+export function drawLumberHut(ctx: Ctx, sx: number, sy: number, time: number, builtAt: number, night: number, lv = 1, lvAt = -10): void {
   withBuild(ctx, builtAt, time, 56, 0.9, sx, sy, () => {
     softShadow(ctx, 6, 6, 62, 26, 0.32);
     const W = 1.7;
@@ -458,6 +463,7 @@ export function drawLumberHut(ctx: Ctx, sx: number, sy: number, time: number, bu
     poly(ctx, [{ x: b.x - 1, y: b.y - 11 }, { x: b.x + 6, y: b.y - 13 }, { x: b.x + 6, y: b.y - 7 }, { x: b.x - 1, y: b.y - 7 }], '#b8c4d0');
     const lp = rel(-W / 2 - 0.1, D / 2 + 0.1);
     for (let i = 0; i < 5; i++) drawItem(ctx, 'wood', lp.x + (i % 3) * 4 - 4, lp.y - 3 - Math.floor(i / 3) * 4.6, 1);
+    lumberTier(ctx, lv, time, lvAt);
   });
 }
 
@@ -919,7 +925,8 @@ export function drawGhost(ctx: Ctx, pad: Pad, sx: number, sy: number, time: numb
 
 
 /** Stacks on the stash deck: one small column per kind, with its count. */
-export function drawStashPiles(ctx: Ctx, stash: Partial<Record<ItemKind, number>>, bumpAt: number, sx: number, sy: number, time: number): void {
+export function drawStashPiles(ctx: Ctx, stash: Partial<Record<ItemKind, number>>, bumpAt: number, sx: number, sy: number, time: number, lv = 1, lvAt = -10): void {
+  stashBack(ctx, sx, sy, lv, time, lvAt);
   const kinds = (Object.keys(stash) as ItemKind[]).filter((k) => (stash[k] ?? 0) > 0);
   if (!kinds.length) return;
   const sq = bumpScale(bumpAt, time);

@@ -2,6 +2,7 @@ import { toScreen } from '../core/iso';
 import type { ResourceNode, Smokehouse } from '../core/types';
 import { LAKE } from '../world/layout';
 import { drawItem } from './items';
+import { smokeTier } from './tiers';
 import { C } from './palette';
 import { ball, ellipse, fillRR, gableRoof, logWalls, onGround, poly, prism, rel, softShadow, vGrad, windowOn } from './shapes';
 import { bumpScale, withBuild } from './structures';
@@ -138,7 +139,7 @@ export function drawIceHole(ctx: Ctx, n: ResourceNode, sx: number, sy: number, t
 
 /* ---------------- Smokehouse ---------------- */
 
-export function drawSmokehouse(ctx: Ctx, s: Smokehouse, bumpAt: number, sx: number, sy: number, time: number, builtAt: number, night: number): void {
+export function drawSmokehouse(ctx: Ctx, s: Smokehouse, bumpAt: number, sx: number, sy: number, time: number, builtAt: number, night: number, lv = 1, lvAt = -10): void {
   withBuild(ctx, builtAt, time, 62, 0.8, sx, sy, () => {
     const sq = bumpScale(bumpAt, time);
     ctx.scale(1, sq);
@@ -198,6 +199,7 @@ export function drawSmokehouse(ctx: Ctx, s: Smokehouse, bumpAt: number, sx: numb
     // Raw salmon waiting.
     const rp = rel(-0.1, D / 2 + 0.35);
     for (let i = 0; i < Math.min(4, s.raw); i++) drawItem(ctx, 'salmon', rp.x - 6 + i * 5, rp.y - 2 - i * 2, 0.8);
+    smokeTier(ctx, lv, time, lvAt, night);
   });
 }
 

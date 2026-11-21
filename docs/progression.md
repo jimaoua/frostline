@@ -185,3 +185,20 @@ upgrades take materials too, but have no construction stages yet.
   Neither the trade mat nor the caravan buys them.
 * **Campaign:** 45 missions. The bot finishes all of them in about 13 minutes
   of game time: Chapters 1–7 in about 10.5, Chapter 8 in about 2.5.
+
+## Stage 4 — Visible station levels
+Every station level adds a piece you can see on the station
+(`render/tiers.ts`). The piece pops in with a bounce, dust, sparkles and a
+ring at the station the moment you buy it.
+
+| Station | Lv2 | Lv3 (gold) | Lv4 (diamonds) |
+|---|---|---|---|
+| Grill | stone chimney with smoke | gold rim and a golden plate | rotisserie spit, blue sparks |
+| Serving counter | chalk menu board | bunting and a gold lantern | table and bench for guests |
+| Fishing hole | rod rack | tackle box and a full bucket | fish-drying rack |
+| Lumberjack Hut | taller log store | sawhorse with a saw | covered lean-to full of logs |
+| Smokehouse | second chimney | second salmon rack | copper lantern, ember glow |
+| Stash | crates | railing with a STASH sign | iron-banded vault chest |
+
+Not done in this stage: the planned "tents become cabins". The camp has no
+tents to upgrade, so that needs new dwellings first.
